@@ -1,61 +1,188 @@
-%% 第二章
+﻿\chapter{相关技术基础}
 
-\chapter{图表示例}
-\chaptermark{图表示例}
+\section{引言}
 
-\section{表格}
-如\autoref{tab:undergraduate-example} 所示，该表展示了两个变量的加法与乘法结果，可作为表格排版与引用的示例。
-\begin{table}[!h]
-    \caption{表格标题}
-    \label{tab:undergraduate-example}
-    \begin{tabular}{|c|c|c|c|}
-        \hline
-        $A$ & $B$ & $A+B$ & $A\times B$ \\ \hline
-        1   & 6   & 7     & 6           \\ \hline
-        2   & 7   & 9     & 14          \\ \hline
-        3   & 8   & 11    & 24          \\ \hline
-    \end{tabular}
-\end{table}
+本章围绕 PhysLucid 系统涉及的核心技术体系，沿着“三维场景表征—视觉语义理解—力学仿真与视频生成”三条主线，对贯穿全文的关键理论基础进行系统阐述。首先介绍以神经辐射场与三维高斯溅射为代表的三维场景渲染技术；随后解析基础图像分割模型 SAM 与多模态大模型（CLIP/VLM）的核心原理；最后阐述连续介质力学中的物质点法（MPM）数值求解框架及 Stable Video Diffusion（SVD）扩散模型的生成机理。本章为后续各章节系统设计与算法实验奠定深厚的理论基础。
 
-\section{插图}
-测试下文章内的图片引用。如\autoref{fig:undergraduate-example} 和\autoref{fig:undergraduate-example2} 所示，
-这是两幅插图。在这其中\autoref{subfig:undergraduate-example2-subfig1} 是第一幅子图，
-\autoref{subfig:undergraduate-example2-subfig2} 是第二幅子图。
+\section{三维场景表征与渲染基础}
 
-\begin{figure}[htb]
-    \includegraphics[scale=0.5]{example.png}
-    \caption{这里是个普通的标题}
-    \label{fig:undergraduate-example}
-\end{figure}
+\subsection{神经辐射场（NeRF）}
 
-\begin{figure}[htb]
-    \begin{subfigure}[t]{0.49\textwidth}\centering
-        \includegraphics[scale=0.5]{example.png}
-        \caption{这是第一个子图标题}
-        \label{subfig:undergraduate-example2-subfig1}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[t]{0.49\textwidth}\centering
-        \includegraphics[scale=0.5]{example.png}
-        \caption{这是第二个子图标题}
-        \label{subfig:undergraduate-example2-subfig2}
-    \end{subfigure}
-    \caption{这里是另一个普通的标题}
-    \label{fig:undergraduate-example2}
-\end{figure}
+神经辐射场（Neural Radiance Fields, NeRF）由 Mildenhall 等人于 2020 年提出\cite{nerf}，是一种基于隐式神经表示的三维场景新视角合成方法。其核心思想是将三维场景表示为一个连续函数 $F_\Theta: (\mathbf{x}, \mathbf{d}) \to (\mathbf{c}, \sigma)$，该函数由多层感知机（MLP）参数化，输入空间坐标 $\mathbf{x} = (x, y, z)$ 与观测方向 $\mathbf{d} = (\theta, \phi)$，输出该点的颜色值 $\mathbf{c} = (r, g, b)$ 和体密度 $\sigma$。
 
-\section{公式示例}
-这里给出正文中的公式引用示例。行内公式可写为 $E=mc^2$，独立编号公式如\autoref{eq:undergraduate-quadratic-formula} 所示，多行推导公式如\autoref{eq:undergraduate-gaussian-sum} 所示。
+在渲染层面，NeRF 采用经典体渲染（Volume Rendering）方程沿光线积分计算像素颜色。对于从相机光心 $\mathbf{o}$ 沿方向 $\mathbf{d}$ 发出的光线 $\mathbf{r}(t) = \mathbf{o} + t\mathbf{d}$，其期望颜色 $\hat{C}(\mathbf{r})$ 由下式给出：
 
 \begin{equation}
-    x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
-    \label{eq:undergraduate-quadratic-formula}
+\hat{C}(\mathbf{r}) = \sum_{i=1}^{N} T_i (1 - \exp(-\sigma_i \delta_i)) \mathbf{c}_i, \quad T_i = \exp\left(-\sum_{j=1}^{i-1} \sigma_j \delta_j\right)
 \end{equation}
 
+其中 $N$ 为沿光线采样的离散点数，$\delta_i = t_{i+1} - t_i$ 为相邻采样点间距，$T_i$ 为累积透射率。
+
+NeRF 通过最小化渲染图像与真实图像之间的光度损失进行端到端优化：
+
 \begin{equation}
-    \begin{aligned}
-        \sum_{i=1}^{n} i &= 1 + 2 + \cdots + n \\
-                         &= \frac{n(n+1)}{2}
-    \end{aligned}
-    \label{eq:undergraduate-gaussian-sum}
+\mathcal{L}_{\text{NeRF}} = \sum_{\mathbf{r} \in \mathcal{R}} \left\| \hat{C}(\mathbf{r}) - C(\mathbf{r}) \right\|_2^2
 \end{equation}
+
+此外，NeRF 引入了位置编码（Positional Encoding）$\gamma(\cdot)$ 将低维输入映射到高维傅里叶特征空间，以克服 MLP 对高频信号的欠拟合问题：
+
+\begin{equation}
+\gamma(p) = \left( \sin(2^0 \pi p), \cos(2^0 \pi p), \ldots, \sin(2^{L-1} \pi p), \cos(2^{L-1} \pi p) \right)
+\end{equation}
+
+尽管 NeRF 在渲染质量上取得了突破性成果，但其逐像素光线采样的渲染方式计算代价极高，单帧渲染通常需要数秒至数十秒，难以满足实时交互需求。这一效率瓶颈直接催生了以三维高斯溅射为代表的显式场景表征方法。
+
+\subsection{三维高斯溅射（3DGS）渲染加速理论}
+
+三维高斯溅射（3D Gaussian Splatting, 3DGS）由 Kerbl 等人于 2023 年提出\cite{3dgs}，是对 NeRF 隐式表征范式的重要突破。3DGS 将场景显式表征为一组各向异性三维高斯椭球体的集合，每个高斯基元 $G_k$ 由以下参数完整定义：
+
+\begin{itemize}
+    \item 中心位置（均值）：$\boldsymbol{\mu}_k \in \mathbb{R}^3$
+    \item 协方差矩阵：$\Sigma_k \in \mathbb{R}^{3 \times 3}$，约束为正定矩阵
+    \item 不透明度：$\alpha_k \in [0, 1]$
+    \item 球谐系数（SH coefficients）：用于编码视角相关的颜色外观
+\end{itemize}
+
+三维高斯函数在空间点 $\mathbf{x}$ 处的响应值定义为：
+
+\begin{equation}
+G_k(\mathbf{x}) = \exp\left( -\frac{1}{2} (\mathbf{x} - \boldsymbol{\mu}_k)^\top \Sigma_k^{-1} (\mathbf{x} - \boldsymbol{\mu}_k) \right)
+\end{equation}
+
+为保证协方差矩阵的物理有效性，实际优化中将其分解为缩放矩阵 $\mathbf{S}_k$ 与旋转矩阵 $\mathbf{R}_k$ 的乘积形式：
+
+\begin{equation}
+\Sigma_k = \mathbf{R}_k \mathbf{S}_k \mathbf{S}_k^\top \mathbf{R}_k^\top
+\end{equation}
+
+渲染时，3DGS 采用 Tile-based 前向泼溅渲染策略。首先将三维高斯投影到二维图像平面，投影后的二维协方差矩阵由相机外参 $\mathbf{W}$ 与投影变换雅可比 $\mathbf{J}$ 近似求得：
+
+\begin{equation}
+\Sigma'_k = \mathbf{J} \mathbf{W} \Sigma_k \mathbf{W}^\top \mathbf{J}^\top
+\end{equation}
+
+随后，对图像平面上的重叠高斯进行从前到后的 Alpha-blending，合成每个像素的颜色：
+
+\begin{equation}
+C(\mathbf{p}) = \sum_{k=1}^{K} \mathbf{c}_k \alpha_k \prod_{j=1}^{k-1} (1 - \alpha_j)
+\end{equation}
+
+其中 $\mathbf{c}_k$ 为由球谐系数在观测方向求得的视角相关颜色。3DGS 通过可微光栅化器实现整个渲染管线的端到端可导，训练时以光度损失与结构相似性损失联合优化：
+
+\begin{equation}
+\mathcal{L}_{\text{3DGS}} = (1 - \lambda) \mathcal{L}_1 + \lambda \mathcal{L}_{\text{D-SSIM}}
+\end{equation}
+
+与 NeRF 相比，3DGS 在保证同等甚至更优渲染质量的前提下，渲染速度提升了数个数量级（可达 4K 分辨率实时渲染），使其成为 PhysLucid 系统三维场景表征的理想基座。
+
+\section{二维视觉基础模型与特征提取}
+
+\subsection{基础图像分割网络（SAM）}
+
+Segment Anything Model（SAM）由 Kirillov 等人于 2023 年提出\cite{sam}，是一个面向通用图像分割任务的基础大模型。SAM 的设计目标是在不针对特定领域进行微调的前提下，对任意图像中的任意物体生成高质量分割掩码，具备强大的零样本泛化能力。
+
+SAM 的架构由三个核心组件构成：
+
+\begin{enumerate}
+    \item \textbf{图像编码器（Image Encoder）}：基于 Vision Transformer（ViT）架构，将输入图像编码为高维特征图。SAM 使用 MAE（Masked Autoencoder）预训练的 ViT-H 作为主干网络，输出 $64 \times 64$ 分辨率的特征嵌入。
+    
+    \item \textbf{提示编码器（Prompt Encoder）}：接收用户输入的提示信息（包括点坐标、边界框、掩码和文本），将稀疏提示（点/框）编码为位置嵌入，将稠密提示（掩码）通过卷积编码后与图像特征融合。
+    
+    \item \textbf{掩码解码器（Mask Decoder）}：基于轻量级 Transformer 结构，在图像嵌入与提示嵌入之间执行交叉注意力，输出分割掩码及其置信度分数。
+\end{enumerate}
+
+在 PhysLucid 系统中，SAM 被用于对 FlashWorld 生成的多视角场景渲染图进行自动前景分割。系统采用自动提示模式，通过均匀网格点采样生成大量候选掩码，再经非极大抑制与置信度筛选获得最终分割结果，为后续深度分层和 VLM 材质识别提供基础掩码输入。
+
+\subsection{视觉-语言多模态大模型（CLIP / VLM）}
+
+视觉-语言多模态大模型是实现跨模态语义理解的核心基础。在 PhysLucid 系统中，该类模型在两个关键环节发挥作用：一是在特征蒸馏阶段通过 CLIP 提取图像语义特征，为 Feature-Splatting 提供监督信号；二是在材质识别阶段作为 VLM 对分割区域进行材质类别预测。
+
+\textbf{对比语言-图像预训练模型（CLIP）。}CLIP 由 Radford 等人于 2021 年提出\cite{clip}，通过大规模图像-文本对的对比学习，将视觉表征与自然语言语义对齐到统一的嵌入空间。CLIP 采用双编码器架构，图像编码器 $f_I$ 与文本编码器 $f_T$ 分别将图像 $I$ 和文本 $T$ 映射为归一化特征向量 $\mathbf{z}^I$、$\mathbf{z}^T$，并通过对称对比损失（InfoNCE）最大化匹配对的余弦相似度，同时推远不匹配对：
+
+\begin{equation}
+\mathcal{L}_{\text{CLIP}} = -\frac{1}{2N} \sum_{i=1}^{N} \left( \log \frac{e^{\mathbf{z}_i^I \cdot \mathbf{z}_i^T / \tau}}{\sum_j e^{\mathbf{z}_i^I \cdot \mathbf{z}_j^T / \tau}} + \log \frac{e^{\mathbf{z}_i^T \cdot \mathbf{z}_i^I / \tau}}{\sum_j e^{\mathbf{z}_i^T \cdot \mathbf{z}_j^I / \tau}} \right)
+\end{equation}
+
+其中 $\tau$ 为可学习的温度参数，$N$ 为批量大小。CLIP 的训练基于约 4 亿对互联网图像-文本数据，其学到的跨模态对齐能力使得零样本分类和文本驱动的视觉检索成为可能。
+
+\textbf{DINO 视觉特征。}除 CLIP 外，PhysLucid 还使用 DINO\cite{dino}的自监督视觉特征来增强对物体局部结构与高频细节的语义感知。DINO 通过自蒸馏（Self-distillation）机制在无标注数据上训练 ViT，其自注意力图中自然涌现出与物体部件分割高度相关的空间结构，为后续的三维特征溅射提供了互补的细粒度语义信息。
+
+\textbf{视觉语言大模型（VLM）。}与 CLIP 的双编码器架构不同，VLM 通常采用自回归语言模型与视觉编码器的联合架构，能够生成自然语言文本序列以描述或推理图像内容。PhysLucid 系统采用 Qwen3-VL-32B\cite{qwenvl} 作为材质识别 VLM，通过将 SAM 分割得到的各深度层掩码区域裁剪拼接后输入模型，获取每个区域的材质类别预测与置信度。相较于 CLIP 的隐式语义对齐，VLM 提供了显式的自然语言材质标注，可直接映射到材料本构模型的物理参数空间。
+
+\section{连续介质力学与视频生成先验}
+
+\subsection{物质点法（MPM）的动态演化基础}
+
+物质点法（Material Point Method, MPM）是一类混合 Lagrangian-Eulerian 格式的连续介质力学数值求解方法，特别适用于处理大变形、断裂、碰撞等极端力学问题。其核心优势在于使用 Lagrangian 粒子（物质点）携带全部物理状态量，在 Eulerian 背景网格上求解动量守恒方程，从而在每一时间步内自然处理接触与自碰撞。
+
+\textbf{控制方程。}连续介质在等温条件下的运动遵循质量守恒与动量守恒：
+
+\begin{equation}
+\frac{D\rho}{Dt} + \rho \nabla \cdot \mathbf{v} = 0, \quad \rho \frac{D\mathbf{v}}{Dt} = \nabla \cdot \boldsymbol{\sigma} + \rho \mathbf{g}
+\end{equation}
+
+其中 $\rho$ 为密度，$\mathbf{v}$ 为速度场，$\boldsymbol{\sigma}$ 为 Cauchy 应力张量，$\mathbf{g}$ 为体力加速度。材料的本构关系通过弹塑性模型定义，对于各向同性线弹性材料，Cauchy 应力由 Hooke 定律给出：
+
+\begin{equation}
+\boldsymbol{\sigma} = 2\mu \boldsymbol{\varepsilon} + \lambda \operatorname{tr}(\boldsymbol{\varepsilon}) \mathbf{I}
+\end{equation}
+
+$\boldsymbol{\varepsilon}$ 为无穷小应变张量，$\mu$ 和 $\lambda$ 为 Lam\'{e} 常数，它们与工程常数杨氏模量 $E$ 和泊松比 $\nu$ 的关系为：
+
+\begin{equation}
+\mu = \frac{E}{2(1 + \nu)}, \quad \lambda = \frac{E\nu}{(1 + \nu)(1 - 2\nu)}
+\end{equation}
+
+\textbf{MPM 求解流程。}单个时间步的 MPM 计算遵循以下粒子-网格-粒子（P2G-G2P）循环：
+
+\begin{enumerate}
+    \item \textbf{粒子到网格（P2G）}：将物质点的质量和动量通过形函数 $N_i(\mathbf{x}_p)$ 转移到背景网格节点，计算节点质量 $m_i = \sum_p m_p N_i(\mathbf{x}_p)$ 和节点动量 $(m\mathbf{v})_i = \sum_p m_p \mathbf{v}_p N_i(\mathbf{x}_p)$。
+    
+    \item \textbf{网格应力计算}：在网格节点上计算内力 $-\sum_p V_p \boldsymbol{\sigma}_p \nabla N_i(\mathbf{x}_p)$，其中 $V_p$ 为粒子体积。施加外部力后，在网格上求解离散动量方程更新节点速度。
+    
+    \item \textbf{网格到粒子（G2P）}：将更新后的网格节点速度插值回物质点，更新物质点的位置 $\mathbf{x}_p^{n+1} = \mathbf{x}_p^n + \Delta t \cdot \mathbf{v}_p^{n+1}$、速度及变形梯度 $\mathbf{F}_p$。
+    
+    \item \textbf{本构更新}：根据变形梯度和材料本构模型更新每个物质点的应力 $\boldsymbol{\sigma}_p$。
+    
+    \item \textbf{网格重置}：丢弃变形后的背景网格，在下一时间步重新初始化，从而避免网格畸变问题。
+\end{enumerate}
+
+\textbf{PhysGaussian 中的应用。}PhysGaussian\cite{physgaussian}首次将 3DGS 的高斯核中心直接映射为 MPM 物质点，赋予每个高斯粒子质量、刚度和摩擦系数等物理属性。这一方案实现了从静态 3DGS 场景到动态物理仿真的无缝过渡，为 PhysLucid 系统提供了物理仿真引擎的理论基础。在 PhysLucid 中，每个高斯粒子 $G_k$ 除原有的视觉属性外，还附加了密度 $\rho_k$、杨氏模量 $E_k$ 和泊松比 $\nu_k$ 三组物理属性，由下游的材质蒸馏与扩散优化模块求解。
+
+\subsection{视频扩散模型（SVD）机理}
+
+Stable Video Diffusion（SVD）是一种基于潜在扩散模型（Latent Diffusion Models, LDM）的图像到视频（Image-to-Video）生成模型。SVD 通过在潜在空间进行扩散与去噪过程，以单张图像为条件生成具有时空一致性的视频序列，为物理参数的梯度优化提供了强有力的视觉先验\cite{dreamphysics}。
+
+\textbf{潜在扩散模型的前向过程。}给定数据分布 $q(\mathbf{x}_0)$，前向扩散过程通过 $T$ 步逐步向干净数据 $\mathbf{x}_0$ 中添加高斯噪声，产生一系列噪声样本 $\mathbf{x}_1, \ldots, \mathbf{x}_T$：
+
+\begin{equation}
+q(\mathbf{x}_t | \mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_t; \sqrt{1 - \beta_t} \mathbf{x}_{t-1}, \beta_t \mathbf{I})
+\end{equation}
+
+其中 $\beta_t \in (0, 1)$ 为预定义的噪声调度参数。利用重参数化技巧，可直接从 $\mathbf{x}_0$ 得到任意时间步 $t$ 的噪声版本：
+
+\begin{equation}
+\mathbf{x}_t = \sqrt{\bar{\alpha}_t} \mathbf{x}_0 + \sqrt{1 - \bar{\alpha}_t} \boldsymbol{\epsilon}, \quad \boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})
+\end{equation}
+
+其中 $\alpha_t = 1 - \beta_t$，$\bar{\alpha}_t = \prod_{s=1}^{t} \alpha_s$。
+
+\textbf{反向去噪过程。}扩散模型的训练目标是学习一个噪声预测网络 $\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})$，从噪声数据中逐步恢复原始信号，其中 $\mathbf{c}$ 为条件信号（如图像条件）。SVD 采用的训练目标为：
+
+\begin{equation}
+\mathcal{L}_{\text{SVD}} = \mathbb{E}_{\mathbf{x}_0, \boldsymbol{\epsilon}, t, \mathbf{c}} \left[ \left\| \boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c}) \right\|_2^2 \right]
+\end{equation}
+
+\textbf{潜在空间操作。}为降低计算复杂度，SVD 将扩散过程从像素空间迁移到预训练 VAE 编码器 $\mathcal{E}$ 的潜在空间。给定视频序列 $\mathbf{V} \in \mathbb{R}^{F \times H \times W \times 3}$，首帧 $\mathbf{I}_0$ 被编码为潜在表示 $\mathbf{z}_0 = \mathcal{E}(\mathbf{I}_0)$，后续帧在潜在空间中进行扩散生成，最终通过 VAE 解码器 $\mathcal{D}$ 重建为像素视频。
+
+\textbf{DreamPhysics 中的 SVD 引导与 SDS 损失。}在 PhysLucid 系统的物理优化阶段，SVD 不直接用于生成视频，而是作为物理逼真度的先验评估器。为实现从扩散模型向物理引擎的知识迁移，系统采用分数蒸馏采样（Score Distillation Sampling, SDS）\cite{dreamfusion} 作为核心损失函数。SDS 的核心思想是利用预训练的扩散模型作为一种可微分的“视觉评分器”：将 MPM 仿真渲染图像 $\mathbf{x}$ 通过前向扩散加噪得到 $\mathbf{x}_t$，计算扩散模型对该噪声样本的去噪预测误差，并将其梯度反传至物理参数 $\theta$（包括杨氏模量 $E$、泊松比 $\nu$、密度 $\rho$）：
+
+\begin{equation}
+\nabla_\theta \mathcal{L}_{\text{SDS}} = \mathbb{E}_{t, \boldsymbol{\epsilon}} \left[ w(t) \left( \hat{\boldsymbol{\epsilon}}_\phi(\mathbf{x}_t, t, \mathbf{c}) - \boldsymbol{\epsilon} \right) \frac{\partial \mathbf{x}}{\partial \theta} \right]
+\end{equation}
+
+其中 $\hat{\boldsymbol{\epsilon}}_\phi$ 为 SVD 的噪声预测网络，$\mathbf{c}$ 为首帧图像条件，$w(t)$ 为与时间步相关的加权系数。该梯度的直观含义是：当 MPM 仿真渲染结果与 SVD 的视频运动先验分布存在偏差时，SDS 会沿使仿真画面更“自然”的方向微调物理参数，从而实现无需真值标注的物理参数自监督反演。
+
+\section{本章小结}
+
+本章系统梳理了贯穿 PhysLucid 系统研发的核心理论与技术。在三维场景表征方面，通过对比隐式辐射场与三维高斯溅射，阐明了场景重建从保真度向高效率演进的关键思路。在视觉语义理解方面，从 SAM 的全开集分割能力到 CLIP 与 VLM 的跨模态语义认知，构建了连接二维像素级视觉表象与三维物理世界概念的语义桥梁。在动力学仿真方面，探讨了 MPM 计算框架的大变形数值处理优势以及 SVD 在可微物理优化中提供的视频时空表征先验机制。以上理论基础的有机结合，不仅构成了现代“场景生成—物理仿真”闭环的技术底座，更为探索高保真虚实交互提供了核心驱动。

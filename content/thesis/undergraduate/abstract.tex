@@ -1,13 +1,21 @@
-%% 摘要
+﻿%% 摘要
 
 % 中文摘要
 \begin{abstract}
-    这是一个适用于西北工业大学学位论文写作的文档类模板 \textbf{nwputhesis}，模板来源：\url{https://github.com/1195343015/nwputhesis}。
-    \keywordslist{学位论文, 模板}
+    面向复杂场景下的物理仿真与动态生成需求，本文设计并实现了 PhysLucid——一套物理知识嵌入的复杂场景生成与仿真流程。该流程以文本或参考图像为输入，首先通过 FlashWorld 构建三维高斯场景表示；随后由统一管线完成深度估计、SAM 分割与深度分层，并引入视觉语言模型对材质进行识别与标注。结合材质先验与 VLM 推断结果，为场景中不同区域分配本构模型及初始物理属性范围，为后续物理优化提供约束先验。
+
+    在物理优化阶段，系统基于 Feature-Splatting 将 CLIP 与 DINO 语义特征共同蒸馏至每个 3D Gaussian，并引入部件级（Part-level）特征通道以增强物体内部的材质分区能力，同时通过语义标签蒸馏将 VLM 推理预测的材质类别同步映射至高斯特征空间，使各点元兼具视觉语义与物理材质双重表征。随后，使用自适应预设与 GPU 加速的文本驱动前景分割机制冻结大规模静态背景，仅保留前景主体。将前景区域输入 DreamPhysics 模块，在 Stable Video Diffusion（SVD）视频先验引导下，梯度优化各高斯点的杨氏模量等物理参数。最后，系统融合上述结果生成物理初始化配置，驱动基于物质点法（MPM）的多材质物理仿真完成场景动态演化。
+
+    本文系统集成场景生成、语义理解、材质蒸馏与物理仿真四个环节，打通了从二维输入到三维重建，再到物理动态演化的完整链路。相较于仅依赖单一视觉特征的传统方案，该方法能更稳定地分离前景主体与静态背景，并为不同材质区域提供合理的物理先验，显著提升复杂场景仿真的可用性。实验表明，该流程在帽子、花瓶、雕塑等案例上均成功完成相关任务，为复杂场景生成与物理交互研究提供了可复现的实现基础。
+    \keywordslist{复杂场景生成, 物理仿真, 材质蒸馏, 语义分割}
 \end{abstract}
 
 % 英文摘要
 \begin{engabstract}
-    This is a document class template named \textbf{nwputhesis} for thesis writing at Northwestern Polytechnical University. Template source: \url{https://github.com/1195343015/nwputhesis}.
-    \engkeywordslist{thesis, template}
+    This thesis presents PhysLucid, a physics-embedded pipeline for complex scene generation and simulation. Given a text prompt or reference image, the system constructs a 3D Gaussian scene via FlashWorld, then performs depth estimation, SAM-based segmentation, and depth-layer splitting. A vision-language model (VLM) recognizes materials; combining material priors with VLM inference, constitutive models and initial physical property ranges are assigned to each region, providing constrained priors for physical optimization.
+
+    During optimization, Feature-Splatting distills both CLIP and DINO semantic features into each 3D Gaussian, and introduces part-level feature channels for enhanced intra-object material partitioning, while semantic label distillation maps VLM-predicted material categories onto the Gaussian feature space, endowing each primitive with visual semantics and material properties. A text-driven foreground segmentation with adaptive presets and GPU-accelerated component analysis then freezes the static background, retaining only the foreground for simulation. The foreground is fed into DreamPhysics, where physical parameters such as Young's modulus are gradient-optimized under the video prior of Stable Video Diffusion (SVD). The resulting configuration drives an MPM-based multi-material simulation.
+
+    Integrating scene generation, semantic understanding, material distillation, and physical simulation, this pipeline establishes a complete workflow from 2D input to 3D reconstruction and onward to physical dynamic evolution. Compared with traditional approaches relying on a single visual feature, this method separates foreground from background more stably and provides reasonable physical priors for different material regions. Experiments on cases including hats, vases, and sculptures demonstrate the pipeline's effectiveness, offering a reproducible foundation for research on complex scene generation and physical interaction.
+    \engkeywordslist{complex scene generation, physical simulation, material distillation, semantic segmentation}
 \end{engabstract}
