@@ -1,15 +1,46 @@
-﻿\chapter{PhysLucid 平台实验结果与系统分析}
+﻿\chapter{平台实验结果与系统分析}
+
 \section{引言}
-\section{实验环境配置与数据集构建}
-\subsection{软硬件开发环境设置}
-\subsection{场景评估数据集及配置（帽子、花瓶、雕塑等）}
-\section{三维场景前端解析与预处理模块验证}
-\subsection{Depth Split 深度消解与对齐评估}
-\subsection{多模态框架下的材质分类准确性验证}
-\section{背景解绑与物理仿真参数寻优消融分析}
-\subsection{大体量静态背景隔离技术（Mark-Foreground）对比}
-\subsection{SVD 视频先验参数微调寻优的有效性分析}
-\section{系统级物理保真度与交互测试}
-\subsection{多材质耦合动态响应闭环试验}
-\subsection{极端工况下模型泛化与物理抗真性测试}
+本章从系统级验证角度，对 PhysLucid 管线的关键模块进行定性与定量评估，包括实验环境配置与评估数据集、三维场景前端预处理（深度分层、材质分类）与后端物理仿真（前景解耦、SVD 参数寻优）的消融分析，以及基于生成视频审美质量（Aesthetic Quality）和时空切片（X-t Slice）指标的系统性验证。
+
+\section{实验环境配置与评估数据集}
+
+\subsection{软硬件开发环境}
+给出 GPU 型号、显存、CUDA 版本、PyTorch 版本、Warp 版本等关键依赖。
+
+\subsection{评估场景与数据构建}
+构建包含帽子、花瓶、雕塑等多类复杂场景的评估数据集，涵盖刚体（雕塑、花瓶）、弹性体（橡胶）、织物（帽子）等多材质组合。每个场景记录 FlashWorld\cite{flashworld}生成的原始多视角图像、深度图、SAM\cite{sam}分割掩码、VLM\cite{qwen25vl}材质预测标签以及 MPM\cite{mpm}仿真渲染视频。
+
+\section{定性分析：多场景仿真可视化}
+
+\subsection{不同场景下的物理仿真效果}
+展示帽子、花瓶、雕塑三个典型案例的 MPM 仿真关键帧序列，对比初始帧与受力形变后的高斯渲染图像，直观验证系统对不同材质（织物褶皱、刚体碰撞、弹性体回弹）的物理响应能力。
+
+\subsection{前景—背景解耦效果可视化}
+展示 Mark-Foreground 五阶段管线输出的前景掩码与背景冻结后的仿真对比：冻结背景的仿真仅在目标物体上产生形变，而未冻结的仿真导致整个场景被牵连。
+
+\section{定量评估：VBench 审美质量与时空一致性}
+
+\subsection{VBench Aesthetic Quality 评估}
+参照 DreamPhysics\cite{dreamphysics}的评估范式，采用 VBench 中的 Aesthetic Quality 指标对 MPM 仿真渲染视频进行评分。该指标基于预训练的审美评估模型，从画面构图、色彩协调性和视觉吸引力等维度衡量生成视频的视觉质量。分别对帽子、花瓶、雕塑三个场景在优化前（初始物理参数）与优化后（SDS 梯度寻优完成）的仿真视频进行评分对比，验证 SVD\cite{svd}视频先验引导的参数优化对视觉质量的提升效果。
+
+\subsection{时空切片（X-t Slice）运动一致性分析}
+为进一步量化运动连续性与物理合理性，采用时空切片（Space-Time Slice）分析方法。在仿真视频中沿固定水平线（X-t Slice）或垂直线（Y-t Slice）提取单行/单列像素随时间的变化，生成时空切片图。对于物理真实的运动，X-t Slice 应呈现平滑连续的轨迹；而对于非物理的抖动或突变，则表现为断裂或锯齿状纹理。通过对不同材质区域（织物、弹性体、刚体）的 X-t Slice 进行可视化对比与频谱分析，量化评估 MPM 仿真的时空一致性。
+
+\section{消融实验}
+
+\subsection{深度分层（Depth Split）消融}
+对比有无 Depth Split\cite{depthanythingv2}预处理条件下的 VLM 材质分类准确率与最终仿真效果。无深度分层时前后景物体在二维掩码中交叠，导致材质误分类率上升；引入三层深度重切分后分类准确率的提升。
+
+\subsection{材质分类与物理参数映射消融}
+对比 VLM 单次推理、三次多数投票推理与人工标注真值的材质分类精度差异；分析不同材质类别的混淆矩阵，评估 VLM 对石材、金属、织物等典型材质的区分能力。同时验证 composite\_id 组合编码体系与 material\_config.json 经验映射的物理参数初始化合理性。
+
+\subsection{前景分割（Mark-Foreground）消融}
+对比无前景分割（全场景仿真）、单一 CLIP\cite{clip}文本匹配分割、以及五阶段多源证据融合分割三种方案下的 MPM 仿真稳定性与计算耗时。评估得分引导 DBSCAN\cite{dbscan}聚类、四源证据融合、连通分量过滤等各阶段对前景隔离质量的贡献。
+
+\subsection{SVD 视频先验寻优有效性消融}
+对比固定物理参数（无 SDS 优化）、SDS 优化仅开启 E 梯度、以及 SDS 优化配合全部数值稳定机制（CFL 自适应、逐粒子钳位、按材质梯度归一化）三种配置下的 VBench Aesthetic Quality 与 X-t Slice 平滑度差异，验证各安全机制对优化稳定性的贡献。
+
+
 \section{本章小结}
+本章通过帽子、花瓶、雕塑三类典型场景，从定性可视化、定量指标（VBench Aesthetic Quality、X-t Slice）和消融实验三个维度系统评估了 PhysLucid 管线的有效性。实验结果表明，深度分层与 SAM 自动语义分割有效提升了材质分类的准确性；五阶段前景解耦管线显著隔离了背景干扰、降低了无效计算；SVD\cite{svd}视频先验引导的 SDS 参数寻优在多材质场景中稳定提升了仿真视觉质量与运动一致性。

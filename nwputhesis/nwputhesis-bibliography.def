@@ -220,6 +220,14 @@
     {\usebibmacro{related:init}\usebibmacro{related}}
     {}%
   \usebibmacro{annotation}\usebibmacro{finentry}}
+\nwpu_if_bachelor:T{%
+    \renewbibmacro*{volume+number+eid}{%
+        \printfield{volume}%
+        \iffieldundef{number}
+            {}
+            {\setunit*{\addspace}\printtext{\mkbibparens{\printfield{number}}}}%
+    }%
+}
 \nwpu_if_bachelor:TF{%
     \DeclareStyleSourcemap{
         \maps[datatype=bibtex]{
@@ -330,10 +338,37 @@
     \mkgbnumlabel{\printfield{labelnumber}}\hspace{\nwpuBibLabelNumberGap}}
 % hanging 模式不覆盖环境，使用 gb7714-2015 默认的 list 环境
 \str_if_eq:VnF \l__nwpu_bibindent_tl { hanging } {
-    \defbibenvironment{bibliography}
-        {\begingroup\setlength{\parindent}{\nwpuBibParIndent}\setlength{\emergencystretch}{\nwpuBibEmergencyStretch}\sloppy}
-        {\endgroup}
-        {\nwpu@bibitemcmd}
+    \nwpu_if_bachelor:TF
+      {
+        \defbibenvironment{bibliography}
+          {
+            \list
+              { \mkgbnumlabel{\printfield{labelnumber}} }
+              {
+                \setlength{\labelwidth}{\labelnumberwidth}
+                \setlength{\labelwidth}{\dim_max:nn { \labelwidth } { \l__nwpu_bib_firstline_reserve_dim }}
+                \setlength{\labelsep}{\nwpuBibLabelNumberGap}
+                \setlength{\leftmargin}{\dim_eval:n { \labelwidth + \labelsep }}
+                \setlength{\itemindent}{0pt}
+                \setlength{\itemsep}{\bibitemsep}
+                \setlength{\parsep}{\bibparsep}
+                \setlength{\parskip}{0pt}
+                \setlength{\listparindent}{0pt}
+                \renewcommand*{\makelabel}[1]{##1\hfil}
+              }
+            \setlength{\parindent}{\nwpuBibParIndent}
+            \setlength{\emergencystretch}{\nwpuBibEmergencyStretch}
+            \sloppy
+          }
+          {\endlist}
+          {\item}
+      }
+      {
+        \defbibenvironment{bibliography}
+            {\begingroup\setlength{\parindent}{\nwpuBibParIndent}\setlength{\emergencystretch}{\nwpuBibEmergencyStretch}\sloppy}
+            {\endgroup}
+            {\nwpu@bibitemcmd}
+      }
 }
 \AtBeginBibliography{                                        %
     \nwpuBodyFont                                           %

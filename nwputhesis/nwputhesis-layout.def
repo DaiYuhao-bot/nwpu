@@ -158,6 +158,7 @@
 \RequirePackage[
     backend=biber,
     style=\l__nwpu_bibstyle_tl,
+    gbnamefmt=lowercase,
     gbpunctin = false,
     sorting=none
 ]{biblatex}                                                 % 参考文献

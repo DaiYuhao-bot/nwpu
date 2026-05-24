@@ -92,6 +92,11 @@
         UprightFont = *-Regular,
         BoldFont    = *-Bold,
     ]
+    \setCJKmonofont{FandolHei}[
+        Extension   = .otf,
+        UprightFont = *-Regular,
+        BoldFont    = *-Bold,
+    ]
     \newfontfamily\engfont{TeX~Gyre~Termes}[
         UprightFont    = texgyretermes-regular.otf,
         BoldFont       = texgyretermes-bold.otf,
@@ -119,6 +124,7 @@
         \setCJKsansfont[Path=fonts/, AutoFakeBold]{simhei.ttf}
         \setCJKfamilyfont{song}[Path=fonts/, AutoFakeBold]{simsun.ttc}
         \setCJKfamilyfont{hei}[Path=fonts/, AutoFakeBold]{simhei.ttf}
+        \setCJKmonofont[Path=fonts/, AutoFakeBold]{simhei.ttf}
         \setCJKfamilyfont{eng}[Path=fonts/, BoldFont=timesbd.ttf, ItalicFont=timesi.ttf, BoldItalicFont=timesbi.ttf]{times.ttf}
         \cs_new_protected:Npn \fEng {\CJKfamily{eng}}
         \setsansfont[Path=fonts/, BoldFont=timesbd.ttf, ItalicFont=timesi.ttf, BoldItalicFont=timesbi.ttf]{times.ttf}
@@ -129,6 +135,7 @@
         \setCJKsansfont[AutoFakeBold]{\defaultHei}
         \setCJKfamilyfont{song}[AutoFakeBold]{\defaultSog}
         \setCJKfamilyfont{hei}[AutoFakeBold]{\defaultHei}
+        \setCJKmonofont[AutoFakeBold]{\defaultHei}
         \setCJKfamilyfont{eng}{\defaultEngFont}
         \cs_new_protected:Npn \fEng {\CJKfamily{eng}}
         \setsansfont[AutoFakeBold]{\defaultEngSansFont}
