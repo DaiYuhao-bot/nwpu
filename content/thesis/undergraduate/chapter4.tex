@@ -2,13 +2,13 @@
 
 \section{引言}
 在上一章中，系统基于视觉语言大模型和深度分层技术，完成了二维平面下的细粒度实例掩码提取与基础本构属性映射，并获得了带有空间位姿信息的初始点云。然而，对于后续的三维物理仿真（如物质点法）而言，纯粹的二维掩码和稀疏离散点云并不足以支撑连续、高保真的几何碰撞与材质运算。这就要求我们将从多重视图和二维基础模型中提取到的高维特征，精确且稳定地投影到具有明确几何体积的三维表征之中。
-为此，本文系统以三维高斯溅射（3D Gaussian Splatting, 3DGS）\cite{3dgs}为三维表征，基于 Feature Splatting\cite{featuresplatting}的框架采用了联合语言先验与视觉几何先验的特征蒸馏方案，其流程如图~\ref{fig:chapter4}所示。本章依次阐述高斯原语中特征向量的嵌入方式、CLIP 与 DINO 多尺度特征的蒸馏策略、材质分类的特征蒸馏策略及自适应 DINO 损失Warmup机制，最后结合空间梯度边界约束与材质分类框架实现背景剔除与前景材质的分割。
+为此，本文系统以三维高斯溅射（3D Gaussian Splatting, 3DGS）\cite{3dgs}为三维表征，基于 Feature Splatting\cite{featuresplatting}的框架采用了联合语言先验与视觉几何先验的特征蒸馏方案，其流程如图~\ref{fig:feature_spaltting}所示。本章依次阐述高斯原语中特征向量的嵌入方式、二维视觉特征预提取流程、特征蒸馏方法的互补机制与损失设计，以及面向物理仿真的材质分类与前景背景分割框架。
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{chapter4.png}
-    \caption{特征蒸馏与前景背景精准解耦框架}
-    \label{fig:chapter4}
+    \includegraphics[width=0.9\linewidth]{feature_splatting.png}
+    \caption{三维高斯特征蒸馏示意图}
+    \label{fig:feature_splatting}
 \end{figure}
 
 \section{高斯原语的语义扩展}
@@ -35,24 +35,150 @@
 \subsection{DINOv2 空间结构特征}
 为了增强对物体边界和局部纹理的感知，系统同步从 DINOv2\cite{dinov2} ViT-S/14 自监督模型中提取 patch token 特征（输入最长边 1024 像素）。DINOv2 通过自蒸馏预训练习得的注意力机制天然对物体轮廓与高频纹理具有响应，其 patch 特征图为后续的语义一致性约束提供空间平滑性引导。
 
-为增强特征提取的鲁棒性，系统在此基础上引入了多项过滤与质量保障机制：（1）\textbf{超大掩码面积过滤}：当 YOLO 检测框或 SAM 分割掩码覆盖超过预设面积比例的图像区域时（默认阈值分别为 0.4 与 0.5），自动丢弃该类大面积伪目标，避免墙壁、桌面等背景区域污染语义特征；（2）\textbf{检测失败安全降级}：当检测器对某帧图像完全失效时，系统不再回退至全图伪目标掩码，而是输出空掩码并依赖后续的背景填充机制以原始全图 patch 特征补全未覆盖区域，从根源上防止背景语义混入前景特征；（3）\textbf{DINOv2 特征逐像素 L2 归一化}：在保存 DINO patch 特征前执行逐通道归一化，消除不同图像间特征尺度的系统性偏移，使后续余弦相似度监督更加稳定。
-
 经此阶段，每帧图像生成三类特征文件共同构成蒸馏训练阶段的多源语义监督信号。
 
-\section{CLIP与DINO双流特征蒸馏}
-系统采用跨模态语义（CLIP）与细粒度视觉几何（DINO）的双流特征蒸馏方案，默认启用部件级特征蒸馏以增强物体内部的结构化材质分区能力。
+\section{特征蒸馏方法}
+三维高斯特征蒸馏的核心是将视觉基础模型提取的高维语义特征映射至每个高斯原语的可学习特征向量。在正向渲染中，这些特征向量与颜色共享同一组 $\alpha$-blending 权重与透射率积分，通过各自独立的轻量级解码器投影至观测空间，以预提取的二维特征图为监督目标计算损失，使高斯原语在保持多视角几何一致的同时对齐跨模态语义空间与细粒度视觉几何空间。
 
-\subsection{CLIP 与 DINO 的特征互补机制}
-CLIP 以文本-图像对比学习为核心，DINO 作为自监督视觉特征提取网络，其输出特征层对物体边界与局部纹理敏感，可抑制 CLIP 在掩码生成时的感受野外溢。
-通过将两种基础模型的特征投影至蒸馏子空间（默认 32 维），网络计算渲染特征图与目标基准图在余弦相似度上的误差（Cosine Distance Loss）。针对 SAM 掩码未能覆盖的背景像素区域，系统引入\textbf{前景—背景特征对比损失}（Foreground-Background Contrast Loss）：以 SAM\cite{sam} 掩码标记的有效前景像素为界，约束预测特征在背景区域与前景区域之间保持余弦距离，抑制特征蒸馏向背景扩散。训练中所有余弦损失均通过安全包装器执行——当有效掩码区域为空时自动返回零梯度。
+系统为每个高斯同时挂载两组独立的特征通道：视觉蒸馏特征通道存储 CLIP 与 DINO 的语义-几何联合表征，材质语义标签通道存储 VLM 推理得到的材质分类信息。两组通道各自收敛至对应的二维监督信号——视觉蒸馏特征以 CLIP/DINO 预提取的多视特征图为监督目标计算余弦相似度损失，材质语义标签以 VLM 材质分类标签为监督目标计算加权交叉熵损失。所有新增损失项均通过线性斜坡调度逐步介入训练，避免新增监督信号冲击已收敛的 RGB 几何骨架。
 
-系统提供可配置的 DINO 归一化损失权重（dino\_norm\_loss\_weight，默认为 0.0）。特征导向的语义一致性约束（Feature-guided Semantic Consistency）采用基于 8 邻域方向（4 轴对齐 + 4 对角线）的双边滤波式空间平滑策略：仅在 CLIP 与 DINO 特征拼接向量余弦相似度超过预设阈值（默认 0.7）的相邻像素对之间，约束语义 logit 的均方误差趋于零。该机制自动在语义同质区施加平滑、在材质边界处允许突变。当特征图空间维度超过 max\_size（默认 192 像素）时，损失计算前自动通过双线性插值降采样。
+从信息粒度的互补性来看，CLIP 通过文本-图像对比预训练习得了跨模态语义对齐能力，其视觉编码器输出的 patch 级特征对物体类别与全局语义敏感；DINO 作为自监督视觉 Transformer，其注意力层天然响应物体边界与局部纹理结构。CLIP 提供"是什么"的语义判别力，DINO 提供"在哪里"的空间结构约束——后者可有效抑制前者在掩码生成时的感受野外溢。将二者经独立轻量级解码器投影至统一的蒸馏子空间后联合优化，使高斯原语同时对齐跨模态语义空间与细粒度视觉几何空间。
 
-\subsection{DINO 损失预热（Warmup）策略}
-训练初期施加过强的 DINO 特征监督易导致高斯原语容量过度分配于抽象高维向量拟合，破坏 RGB 收敛确立的三维空间几何骨架。为此，DINO 损失权重采用线性预热函数（Scheduled DINO Loss Weight）：从起始迭代（\texttt{dino\_feature\_loss\_start\_iter}，默认 0）开始介入，初始权重由 \texttt{dino\_feature\_loss\_start\_weight}（默认 0.2）指定，在 \texttt{dino\_feature\_loss\_warmup\_iter}（默认 20,000）次迭代内线性爬坡至最终目标值 \texttt{dino\_feature\_loss\_weight}（默认 0.45）。预热完成后保持最终权重不变。该调度使不同场景可根据几何复杂度弹性调配 DINO 特征的介入节奏，在提高峰值信噪比（PSNR）的同时抑制前景-背景交界处的视觉伪影。
+特征蒸馏训练阶段的总体优化目标由 RGB 重建损失、视觉特征蒸馏损失与材质语义分类损失三方加权构成：
+
+\begin{equation}
+\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{rgb}} + \lambda_{\text{feat}}(t) \,\mathcal{L}_{\text{feat}} + \lambda_{\text{sem}}(t) \,\mathcal{L}_{\text{sem}}
+\label{eq:total_loss}
+\end{equation}
+
+其中 $\lambda_{\text{feat}}(t)$ 与 $\lambda_{\text{sem}}(t)$ 均为线性斜坡函数，在训练早期从零逐步爬升至目标权重值（默认 $\lambda_{\text{feat}} = 0.35$、$\lambda_{\text{sem}} = 0.10$），避免新增损失项冲击已初步收敛的几何骨架。
+
+\subsection{RGB 重建损失}
+
+沿用三维高斯溅射的标准光度-结构联合损失：
+
+\begin{equation}
+\mathcal{L}_{\text{rgb}} = (1 - \lambda_{\text{D-SSIM}}) \,\mathcal{L}_1 + \lambda_{\text{D-SSIM}} \,\mathcal{L}_{\text{D-SSIM}}
+\label{eq:rgb_loss}
+\end{equation}
+
+系统取 $\lambda_{\text{D-SSIM}} = 0.2$，$\mathcal{L}_{\text{D-SSIM}} = 1 - \mathrm{SSIM}$。该项确保三维高斯渲染图与输入多视角图像在像素级保持一致。
+
+\subsection{余弦相似度特征蒸馏损失}
+
+对 CLIP 对象级特征 $\mathbf{F}_{\text{CLIP}}$、部件级特征 $\mathbf{F}_{\text{part}}$（默认启用）以及 DINOv2 特征 $\mathbf{F}_{\text{DINO}}$，以余弦相似度量化解码特征图与预提取基准特征图的偏差：
+
+\begin{equation}
+\mathcal{L}_{\text{cos}}(\mathbf{F}, \mathbf{F}^{\text{gt}}; \mathcal{M}) = \frac{1}{|\mathcal{M}|} \sum_{\mathbf{p} \in \mathcal{M}} \left( 1 - \frac{\mathbf{F}(\mathbf{p}) \cdot \mathbf{F}^{\text{gt}}(\mathbf{p})}{\|\mathbf{F}(\mathbf{p})\| \;\|\mathbf{F}^{\text{gt}}(\mathbf{p})\|} \right)
+\label{eq:cos_loss}
+\end{equation}
+
+其中 $\mathcal{M}$ 为有效特征像素的掩码区域（排除未覆盖的背景像素）。所有余弦损失均通过安全包装器执行：当有效区域为空时损失自动置零，避免梯度 NaN 传播。
+
+\subsection{前景-背景特征对比损失}
+
+针对 SAM 掩码未能标注的背景像素区域，引入对比约束抑制特征蒸馏向背景扩散：
+
+\begin{equation}
+\mathcal{L}_{\text{contrast}} = \max\left( \cos\big( \bar{\mathbf{f}}^{\,\text{fg}},\; \bar{\mathbf{f}}^{\,\text{bg}} \big) + m,\; 0 \right)
+\label{eq:contrast}
+\end{equation}
+
+其中前景与背景的平均特征向量经逐区域池化后做 $\ell_2$ 归一化：
+
+\begin{equation}
+\bar{\mathbf{f}}^{\,\text{fg}} = \mathrm{norm}\!\left( \frac{1}{|\mathcal{M}^{\text{fg}}|} \sum_{\mathbf{p} \in \mathcal{M}^{\text{fg}}} \mathbf{F}_{\text{CLIP}}(\mathbf{p}) \right),\quad
+\bar{\mathbf{f}}^{\,\text{bg}} = \mathrm{norm}\!\left( \frac{1}{|\mathcal{M}^{\text{bg}}|} \sum_{\mathbf{p} \in \mathcal{M}^{\text{bg}}} \mathbf{F}_{\text{CLIP}}(\mathbf{p}) \right)
+\label{eq:contrast_fg_bg}
+\end{equation}
+
+$\mathcal{M}^{\text{fg}}$ 为 SAM 掩码标记的有效前景像素集，$\mathcal{M}^{\text{bg}}$ 为其余像素集；余量 $m = 0$。该损失仅在 $\mathcal{M}^{\text{fg}}$ 与 $\mathcal{M}^{\text{bg}}$ 均非空时生效。
+
+\subsection{特征导向语义一致性损失}
+
+基于双边滤波思想，利用 CLIP 与 DINO 拼接特征的空间相似度引导语义 logits 的平滑性：
+
+\begin{equation}
+\mathcal{L}_{\text{fg}} = \frac{1}{|\Omega|} \sum_{(\mathbf{p}, \mathbf{q}) \in \Omega} \mathbf{1}\!\left[ \cos\!\big( \mathbf{f}_{\mathbf{p}},\; \mathbf{f}_{\mathbf{q}} \big) > \tau \right] \cdot \big\| \mathbf{z}_{\mathbf{p}} - \mathbf{z}_{\mathbf{q}} \big\|_2^2
+\label{eq:feature_guided}
+\end{equation}
+
+其中 $\Omega$ 为 8 邻域方向（4 轴向 $+$ 4 对角线）的相邻像素对集合；$\mathbf{f}_{\mathbf{p}} = [\mathbf{F}_{\text{CLIP}}(\mathbf{p}); \mathbf{F}_{\text{DINO}}(\mathbf{p})]$ 为 CLIP 与 DINO 解码特征的拼接向量；$\mathbf{z}_{\mathbf{p}}$ 为像素 $\mathbf{p}$ 处的语义 logits；$\tau = 0.7$ 为相似度阈值。该机制自动在语义同质区施加平滑，在材质边界处因特征突变而自然放宽约束。当特征图空间维度超过 $192$ 时，损失计算前自动降采样。
+
+\subsection{视觉特征蒸馏总损失}
+
+综合以上各项，特征蒸馏总损失定义为：
+
+\begin{equation}
+\mathcal{L}_{\text{feat}} = \mathcal{L}_{\text{cos}}^{\text{CLIP}} + \lambda_{\text{part}} \,\mathcal{L}_{\text{cos}}^{\text{part}} + \lambda_{\text{dino}}(t) \,\mathcal{L}_{\text{cos}}^{\text{DINO}} + \lambda_{\text{contrast}} \,\mathcal{L}_{\text{contrast}} + \lambda_{\text{fg}} \,\mathcal{L}_{\text{fg}}
+\label{eq:feat_total}
+\end{equation}
+
+默认超参数取 $\lambda_{\text{part}} = 0.5$，$\lambda_{\text{contrast}} = 0.05$，$\lambda_{\text{fg}} = 0.0$（默认关闭）；$\lambda_{\text{dino}}(t)$ 采用下述预热调度策略动态调节。
+
+\subsection{DINO 损失权重预热调度}
+
+DINOv2 特征空间抽象程度高，训练初期施加过强监督将破坏 RGB 收敛所确立的三维几何骨架，故引入线性预热：
+
+\begin{equation}
+\lambda_{\text{dino}}(t) = \lambda_{\text{dino}}^{\text{start}} + \big( \lambda_{\text{dino}}^{\text{final}} - \lambda_{\text{dino}}^{\text{start}} \big) \cdot \mathrm{clamp}\!\left( \frac{t - t_{\text{start}}}{t_{\text{warmup}}},\; 0,\; 1 \right)
+\label{eq:dino_warmup}
+\end{equation}
+
+默认配置为 $\lambda_{\text{dino}}^{\text{start}} = 0.2$，$\lambda_{\text{dino}}^{\text{final}} = 0.45$，$t_{\text{start}} = 0$，$t_{\text{warmup}} = 20{,}000$ 次迭代。预热完成后权重保持为 $\lambda_{\text{dino}}^{\text{final}}$ 不变。
+
+\subsection{语义分类损失与长尾平衡}
+
+对材质语义标签的解码输出，以加权交叉熵进行监督。针对 9 种物理材质在自然场景中出现频次极不均衡的长尾分布，采用区域反频率重加权：
+
+\begin{equation}
+\mathcal{L}_{\text{sem}} = -\frac{1}{\sum_{\mathbf{p}} w_{\mathbf{p}}} \sum_{\mathbf{p}} w_{\mathbf{p}} \cdot w_{c(\mathbf{p})} \log \frac{\exp\!\big( z_{c(\mathbf{p})}(\mathbf{p}) \big)}{\sum_{c=0}^{C-1} \exp\!\big( z_{c}(\mathbf{p}) \big)}
+\label{eq:sem_loss}
+\end{equation}
+
+\begin{equation}
+w_c = \frac{f_c^{-\gamma}}{\frac{1}{|\mathcal{C}^+|}\sum_{c' \in \mathcal{C}^+} f_{c'}^{-\gamma}}, \quad f_c = \frac{n_c}{\sum_{c'} n_{c'}}
+\label{eq:class_balance}
+\end{equation}
+
+其中 $c(\mathbf{p}) \in \{0, 1, \dots, 9\}$ 为像素 $\mathbf{p}$ 的材质标签（0 为背景），$z_c(\mathbf{p})$ 为语义标签解码器在类别 $c$ 上的输出 logit，$n_c$ 为类别 $c$ 在有效区域的出现频次，$\mathcal{C}^+$ 为当前批次出现的类别集合，$\gamma = 0.3$ 为平衡指数，$C = 10$ 为材质类别总数。忽略像素（标签 $= -1$）不计入损失。
+
+\subsection{材质边界感知加权}
+
+类别边界处易因深度混叠导致物理参数误分配，系统为边界像素施加增强权重：
+
+\begin{equation}
+w_{\mathbf{p}} = 
+\begin{cases}
+1 + \lambda_{\text{boundary}}, & \mathbf{p} \in \partial\mathcal{S} \\[2pt]
+1,                              & \mathbf{p} \in \mathcal{S} \setminus \partial\mathcal{S} \\[2pt]
+0,                              & \text{otherwise}
+\end{cases}
+\label{eq:boundary_weight}
+\end{equation}
+
+其中 $\mathcal{S}$ 为有效语义区域，$\partial\mathcal{S}$ 为经标签突变检测与形态学膨胀确定的类别边界像素集，$\lambda_{\text{boundary}} = 0.05$。
+
+\subsection{逐高斯语义一致性损失}
+
+为确保每个三维高斯原语在空间中维持统一的物理材质归属，将二维语义标签沿光栅化路径反向投影至各高斯原语进行投票监督：
+
+\begin{equation}
+\mathcal{L}_{\text{gs}} = \frac{1}{\sum_{k\in\mathcal{K}} |\mathcal{V}_k|} \sum_{k \in \mathcal{K}} \sum_{\mathbf{p} \in \mathcal{V}_k} \alpha_{k,\mathbf{p}} \cdot \mathrm{CE}\!\left( \mathrm{dec}\big( \mathbf{f}_k^{\text{sem}} \big),\; y_{\mathbf{p}} \right)
+\label{eq:gs_consistency}
+\end{equation}
+
+其中 $\mathcal{K}$ 为当前视点下参与渲染的高斯原语集合，$\mathcal{V}_k$ 为经高斯 $k$ 光栅化的像素索引集，$\mathbf{f}_k^{\text{sem}}$ 为高斯 $k$ 的独立语义蒸馏特征，$\mathrm{dec}(\cdot)$ 为语义标签解码器，$\alpha_{k,\mathbf{p}}$ 为该像素处高斯 $k$ 的 $\alpha$-blending 权重。该损失延迟至训练 $25{,}000$ 次迭代后接入，并以 $5{,}000$ 次线性预热启动；最小投票数为 $2$，最小置信度阈值为 $0.55$。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{vase_feature_map.png}
+    \caption{花瓶场景的特征蒸馏与材质标签蒸馏结果。第一行为监督目标（GT），第二行为三维高斯解码后的预测结果（Pred）；三列从左至右分别对应 CLIP 特征、DINO 特征和材质标签。其中，结果表明，预测结果与监督目标在主体轮廓、局部结构和材质分区上保持了较高一致性。}
+    \label{fig:vase_feature_map}
+\end{figure}
 
 \section{前景解耦与材质分类框架}
-在视觉蒸馏特征与材质语义标签通过双流蒸馏同步嵌入三维高斯的基础上，以下阐述面向物理仿真的材质分类框架与前景背景分割机制。
+在视觉蒸馏特征与材质语义标签通过特征蒸馏同步嵌入三维高斯的基础上，以下阐述面向物理仿真的材质分类框架与前景背景分割机制。
 
 \subsection{基础材质体系映射}
 系统采用 10 类材质分类框架：1 个背景类别（class 0）与 9 种物理材质类别（石材/陶瓷、玻璃、塑料、金属、木材、橡胶、沙土颗粒、流体、织物），每种材质在 \texttt{material\_config.json}（v2.0）中预定义了与 MPM 求解器类型对应的 solver\_id、杨氏模量范围、泊松比范围与密度范围。
@@ -63,9 +189,12 @@ CLIP 以文本-图像对比学习为核心，DINO 作为自监督视觉特征提
 
 此外，针对 CLIP 文本匹配在部分场景中前景召回不佳的问题，系统额外实现了基于 SAM 二维掩码的备选前景标记工具，通过多视角掩码投票将二维分割结果反投影至三维高斯空间，作为文本驱动方法的补充链路。经此管线，原本复杂交织的背景被有效剥离，仅保留真正参与交互的前景主体进入后续的 MPM 仿真阶段。
 
-\subsection{长尾分布及边界加权的约束优化}
-在进行真实场景材质归类时，稀有材质类别仅占据极少的视度像素，形成长尾分布。系统在损失评估中引入区域反频率权重，对稀有材质进行自适应误差放大，以 $\gamma=0.3$ 的类别平衡指数对交叉熵损失加权。语义标签解码器中引入独立于视觉蒸馏的\textbf{语义标签特征库}，使语义分类损失的梯度仅回传至语义标签专用特征，不污染 CLIP/DINO 的视觉蒸馏特征空间。为进一步确保三维语义一致性，系统引入\textbf{逐高斯语义一致性损失}：利用光栅化器输出的像素-高斯索引，将二维语义标签反投影至每个高斯原语进行投票监督，约束各高斯在三维空间中保持统一的材质归属。语义损失的时延调度为：像素级交叉熵从训练起始接入，语义特征更新在 50,000 次迭代后关闭以保证视觉特征充分收敛，逐高斯约束延迟至 25,000 次迭代并以 5,000 次线性启动。
-深度混叠易导致物质边界处的物理参数重叠，算法增加了类别边界感知加权机制：对深度陡变或特征不连续处标记为 ignored pixels 的不可靠像素，通过局部特征余弦平滑约束两侧空间特征的纯净性。为防止复杂场景训练中的显存溢出，此外，本文系统引入硬性的高斯点密度上限控制以避免显存爆炸，高斯例子数量达到阈值时屏蔽致密化操作。
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{mark_foreground.png}
+    \caption{前景分割流程图}
+    \label{fig:mark_foreground}
+\end{figure}
 
 \section{本章小结}
-本章阐明了从二维语义特征到三维物理材质场的蒸馏解耦与前景隔离方法。在特征预提取阶段，以分割为基础，完成对象级与零件级 CLIP 特征聚合及 DINOv2 空间结构特征提取，并通过掩码过滤机制确保监督信号的一致性。在蒸馏阶段，将 CLIP 与 DINO 特征投影至 32 维蒸馏空间并施加余弦相似度损失与前景背景对比损失，驱动高斯粒子在保持几何外观的同时对齐视觉蒸馏特征空间；参数化的 DINO 预热机制确保几何骨架在训练初期优先巩固。在材质分类与前景分割阶段，通过独立的语义标签特征库与语义标签解码器实现材质分类，配合前景分割管线实现前景主体与静态背景的隔离，并通过逐高斯语义一致性损失、特征引导的 8 邻域平滑约束等优化，处理了多任务特征冲突与显存控制等工程问题。本章构建的语义-材质双重表征与前景分割机制，为后续 MPM 多材质仿真提供了边界分明、属性完备三维场景。
+本章阐明了从二维语义特征到三维物理材质场的蒸馏解耦与前景隔离方法。在特征预提取阶段，以检测-分割管线为基础，完成对象级与零件级 CLIP 特征聚合及 DINOv2 空间结构特征提取，并通过掩码过滤机制确保监督信号的一致性。在特征蒸馏阶段，分析 CLIP 语义判别力与 DINO 空间结构约束的信息粒度互补机制，将二者投影至 32 维蒸馏子空间联合优化。随后，在特征蒸馏方法节中集中形式化 RGB 重建、余弦相似度蒸馏、前景-背景对比、特征导向语义一致性，以及语义分类中类别平衡、边界加权与逐高斯一致性约束等共计 12 项损失函数及其自适应预热调度策略。在材质分类与前景分割阶段，通过独立语义标签特征库与语义标签解码器实现材质分类，配合五阶段前景分割管线与显存上限控制完成背景剥离。本章构建的语义-材质双重表征与前景分割机制，为后续 MPM 多材质仿真提供了边界分明、属性完备的三维场景。

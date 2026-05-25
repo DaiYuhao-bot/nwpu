@@ -2,14 +2,15 @@
 
 \section{引言}
 构建能够支撑物理仿真的高保真三维场景，是本文系统的基础模块。传统的人工虚拟环境建模，效率低，成本高。随着生成式 AI 的发展，基于单图或文本自动构建三维几何场景成为可能。然而，直接构建的三维分布仅具备视觉表象，缺乏物理参数与本构分类，无法支持后续物理求解器的直接介入。
-为解决上述问题，本章实现了物理参数赋予的流程，其核心流程如图~\ref{fig:chapter3}所示。FlashWorld 场景生成架构完成初始场景的生成，利用依托分割大模型（SAM）与视觉语言大模型（Qwen3-VL-32B\cite{qwen25vl}），实现对场景多视角图像的分割和物理材质预测，并结合材质先验库，辅助推理出各个材质区域的先验杨氏模量、泊松比与密度初始解。
+为解决上述问题，本章实现了物理参数赋予的流程。FlashWorld 场景生成架构完成初始场景的生成，利用依托分割大模型（SAM）与视觉语言大模型（Qwen3-VL-32B\cite{qwen25vl}），实现对场景多视角图像的分割和物理材质预测，并结合材质先验库，辅助推理出各个材质区域的先验杨氏模量、泊松比与密度初始解。流程图如图~\ref{fig:vlm}~所示。
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{chapter3.png}
-    \caption{面向物理仿真的三维场景构建与材质先验初始化流程}
-    \label{fig:chapter3}
+    \includegraphics[width=\linewidth]{sam_vlm.png}
+    \caption{基于视觉语言模型的材质识别流程}
+    \label{fig:vlm}
 \end{figure}
+
 
 \section{物理仿真导向的三维场景生成}
 

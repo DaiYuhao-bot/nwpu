@@ -112,6 +112,7 @@ SAM 的架构由三个核心组件构成：
 \subsection{三维高斯特征蒸馏}
 前述二维视觉基础模型（SAM、CLIP、DINO、VLM）解决了"图像中有什么"的语义感知问题，但要将这些语义信息注入三维场景表征，还需要一个将二维特征迁移至三维高斯原语的映射机制。Feature-Splatting\cite{featuresplatting} 提出了一种通用的三维高斯特征蒸馏框架：在每个高斯原语 $G_k$ 上除原有的视觉参数外，额外挂载一个可学习的 $D$ 维特征向量 $\mathbf{f}_k \in \mathbb{R}^D$，称为蒸馏特征（distill features）。在正向渲染过程中，该特征向量与颜色共享同一组 $\alpha$-blending 权重，渲染得到二维特征图 $\mathbf{F}(\mathbf{p})$：
 
+
 \begin{equation}
 \mathbf{F}(\mathbf{p}) = \sum_{k=1}^{K} \mathbf{f}_k \alpha_k \prod_{j=1}^{k-1} (1 - \alpha_j)
 \end{equation}
