@@ -1,59 +1,83 @@
 ﻿\chapter{多材质本构建模与视频扩散引导的物理参数优化}
 
 \section{引言}
-前两章将语义特征-材质标签蒸馏至三维高斯空间，并实现了前景与静态背景的分割。然而，视觉语言模型推断的材质参数仅为经验区间，在实际的物理仿真中与真实的物理响应有一定差距。因此本文系统建立物理参数优化模块，将仿真任务分解为两个阶段：第一个阶段物理初始化，将逐高斯语义标签转化为多材质物质点法（Material Point Method, MPM）\cite{mpm} 配置，赋予不同材质区域独立的本构模型；第二个阶段参数优化，以 SVD\cite{svd,ldm} 作为物理规律的先验教师模型，通过分数蒸馏采样 SDS\cite{dreamfusion} 和 Warp\cite{warp} 可微管线对杨氏模量 $E$ 进行梯度优化。整体流程如图~\ref{fig:chapter5}所示。
+前两章将语义特征-材质标签蒸馏至三维高斯空间，并实现了前景与静态背景的分割。然而，视觉语言模型推断的材质参数仅为经验区间，在实际的物理仿真中与真实的物理响应有一定差距。因此本文系统建立物理参数优化模块，将仿真任务分解为两个阶段：第一个阶段物理初始化，将逐高斯语义标签转化为多材质物质点法（Material Point Method, MPM）\cite{mpm} 配置，赋予不同材质区域独立的本构模型；第二个阶段参数优化，以 SVD\cite{svd,ldm} 作为物理规律的先验教师模型，通过分数蒸馏采样 SDS\cite{dreamfusion} 和 Warp\cite{warp} 可微管线对杨氏模量 $E$ 进行梯度优化。整体流程如图~\ref{fig:svd_optimization}所示。
 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{svd.png}
     \caption{基于视频先验引导的物理参数优化与多材质连续体仿真}
-    \label{fig:chapter5}
+    \label{fig:svd_optimization}
 \end{figure}
 
 \section{物质点法多材质连续体仿真}
 
 \subsection{质点填充与空间离散化}
-三维高斯提供的是面向视觉渲染的椭球体集合，无法直接支撑体积力驱动的连续体力学计算。因此本文系统对前景高斯粒子壳体内部执行质点填充（Particle Filling）\cite{physgaussian}。以高斯椭球体包围盒为边界约束，通过网格采样填充内部节点，此外还为每个有效内部节点赋予对应高斯的初始物理参数。填充网格分辨率 $n_{\text{grid}}$ 由场景前景点数量确定：前景点数量低于 20 万时目标网格间距 $\mathrm{d}x=0.04$（$n_{\text{grid}}=50$），以上放宽至 $\mathrm{d}x=0.05$，$n_{\text{grid}}$。单网格单元内最多保留 1 个填充粒子，总粒子数上限为 $\min(1.2\times10^6,\;\max(6\times10^5, 2N_{\text{fg}}))$。填充完成后，系统记录各材质标签对应的粒子集合及其三维空间坐标，作为 MPM 仿真的初始构型。
+三维高斯提供的是面向视觉渲染的椭球体集合，无法直接支撑体积力驱动的连续体力学计算。因此本文系统对前景高斯粒子壳体内部执行质点填充（Particle Filling）\cite{physgaussian}。以高斯椭球体包围盒为边界约束，通过网格采样填充内部节点，此外还为每个有效内部节点赋予对应高斯的初始物理参数。填充网格分辨率 $n_{\text{grid}}$ 由场景前景点数量确定：前景点数量低于 20 万时目标网格间距 $\mathrm{d}x=0.04$（$n_{\text{grid}}=50$），以上放宽至 $\mathrm{d}x=0.05$ 并由后续自适应网格规则确定 $n_{\text{grid}}$。单网格单元内最多保留 1 个填充粒子，总粒子数上限为 $\min(1.2\times10^6,\;\max(6\times10^5, 2N_{\text{fg}}))$。填充完成后，系统记录各材质标签对应的粒子集合及其三维空间坐标，作为 MPM 仿真的初始构型。
 
 \subsection{多材质本构模型体系}
 拉格朗日质点承载质量、动量与形变梯度 $\mathbf{F}$，欧拉背景网格用于组装非线性内力与碰撞约束。MPM通过在拉格朗日质点和欧拉背景网格之间交替转移张量来求解动量守恒方程 $\rho\ddot{\mathbf{u}}=\nabla\cdot\boldsymbol{\sigma}+\mathbf{f}_{\text{ext}}$。相较于纯 Lagrangian 网格法，避免了在大变形下的畸变问题。本文系统实现了为不同材质区域分配独立的 MPM 本构模型，在每一 MPM 子步内，各粒子按自身的求解器类型（\texttt{solver\_id}）执行对应的应力计算与塑性返回映射（Return Mapping）。
 
-\textbf{弹性求解器（solver\_id=0, 4）}：固定共旋弹性模型（Fixed Corotated）\cite{physgaussian}。应力由 Kirchhoff 应力张量给出：
+\textbf{弹性求解器}：固定共旋弹性模型（Fixed Corotated）\cite{physgaussian}，应力由 Kirchhoff 应力张量给出：
 \begin{equation}
 \boldsymbol{\tau}=\mathbf{F}\frac{\partial\psi}{\partial\mathbf{F}}^\top=2\mu(\mathbf{F}-\mathbf{R})\mathbf{F}^\top+\lambda J(J-1)\mathbf{I}
 \end{equation}
 其中 $\mathbf{R}$ 来自 $\mathbf{F}$ 的极分解，$\mu=\dfrac{E}{2(1+\nu)}$，$\lambda=\dfrac{E\nu}{(1+\nu)(1-2\nu)}$，$J=\det(\mathbf{F})$。该模型用于石材/陶瓷类刚性材质，无塑性变形。
 
-\textbf{粘弹性求解器（solver\_id=9, 14）}：单模态 Maxwell 粘弹性模型，用于橡胶类材质。弹性部分采用 Neo-Hookean 应力：
+\textbf{粘弹性求解器}：单模态 Maxwell 粘弹性模型，用于橡胶类材质，弹性部分采用 Neo-Hookean 应力：
 \begin{equation}
-\boldsymbol{\tau}_{\text{elastic}}=\mu(\mathbf{F}\mathbf{F}^\top-\mathbf{I})+\lambda(\ln J)\mathbf{I}
+\boldsymbol{\tau}_{\text{elastic}}=\mathbf{U}\operatorname{diag}\!\left(\mu J^{-2/3}\hat{\mathbf{b}}+\frac{\lambda}{2}(J^2-1)\mathbf{1}\right)\mathbf{V}^{\top}\mathbf{F}^{\top},\quad
+\hat{\mathbf{b}}=\boldsymbol{\sigma}^{2}-\frac{1}{3}\left(\sum_i \sigma_i^2\right)\mathbf{1}
 \end{equation}
-Maxwell 粘弹性松弛通过指数衰减递推更新：
+其中 $\mathbf{F}=\mathbf{U}\operatorname{diag}(\boldsymbol{\sigma})\mathbf{V}^{\top}$ 为奇异值分解，$\hat{\mathbf{b}}$ 为左 Cauchy-Green 张量主值的偏量部分。Maxwell 粘弹性松弛通过指数衰减递推更新：
 \begin{equation}
 \boldsymbol{\tau}^{\,t+1}=e^{-\Delta t\cdot\mu/\eta}\,\boldsymbol{\tau}^{\,t}+(1-e^{-\Delta t\cdot\mu/\eta})\,\boldsymbol{\tau}_{\text{elastic}}
 \end{equation}
 其中 $\eta=\texttt{plastic\_viscosity}=10^{-4}$ 为全局 Maxwell 阻尼系数。该模型在短时间尺度内表现为弹性体，长时间尺度内应力逐渐松弛至零。
 
-\textbf{弹塑性求解器（solver\_id=1, 10, 11）}：基于 von Mises 屈服准则的弹塑性模型，应力采用 St. Venant-Kirchhoff 形式：
+\textbf{弹塑性求解器}：基于 von Mises 屈服准则的弹塑性模型，应力采用对数主应变形式：
 \begin{equation}
-\boldsymbol{\tau}=2\mu\boldsymbol{\varepsilon}+\lambda\operatorname{tr}(\boldsymbol{\varepsilon})\mathbf{I},\quad\boldsymbol{\varepsilon}=\tfrac{1}{2}(\mathbf{F}^\top\mathbf{F}-\mathbf{I})
+\boldsymbol{\tau}=\mathbf{U}\operatorname{diag}\!\left(2\mu\boldsymbol{\varepsilon}+\lambda\operatorname{tr}(\boldsymbol{\varepsilon})\mathbf{1}\right)\mathbf{V}^{\top}\mathbf{F}^{\top},\quad
+\boldsymbol{\varepsilon}=(\ln\sigma_1,\ln\sigma_2,\ln\sigma_3)^{\top}
 \end{equation}
-金属基础模型（solver\_id=1）执行标准 von Mises 径向返回映射：当等效应力 $\sigma_{\text{eq}}=\sqrt{\frac{3}{2}\|\operatorname{dev}(\boldsymbol{\tau})\|}$ 超过屈服应力 $\sigma_y$ 时，将偏应力沿径向缩回至屈服面。塑料硬化模型（solver\_id=10）在此基础上引入各向同性硬化 $\sigma_y\leftarrow\sigma_y+2\mu\xi\delta\gamma$（$\xi$ 为硬化系数，$\delta\gamma$ 为塑性增量），模拟塑料受力后的渐进硬化。高级金属模型（solver\_id=11）进一步集成了率相关性（viscosity）与软化（softening）联合机制，适用于模拟金属在高速冲击下的应变率敏感行为。
+金属基础模型（solver\_id=1）执行标准 von Mises 径向返回映射：当等效应力 $\sigma_{\text{eq}}=\sqrt{\frac{3}{2}\operatorname{dev}(\boldsymbol{\tau}):\operatorname{dev}(\boldsymbol{\tau})}$ 超过屈服应力 $\sigma_y$ 时，将偏应力沿径向缩回至屈服面。塑料硬化模型（solver\_id=10）在此基础上引入各向同性硬化 $\sigma_y\leftarrow\sigma_y+2\mu\xi\delta\gamma$（$\xi$ 为硬化系数，$\delta\gamma$ 为塑性增量），模拟塑料受力后的渐进硬化。高级金属模型（solver\_id=11）进一步集成了率相关性（viscosity）与软化（softening）联合机制，适用于模拟金属在高速冲击下的应变率敏感行为。
 
-\textbf{颗粒求解器（solver\_id=2）}：Drucker-Prager 模型，用于沙土/颗粒类材质。剪切屈服面由摩擦角控制，允许体积膨胀（剪胀效应），但在纯拉伸状态下禁止体积保持以防止过度膨胀。
+\textbf{颗粒求解器}：Drucker-Prager 模型，用于沙土/颗粒类材质。对变形梯度 $\mathbf{F}$ 进行奇异值分解 $\mathbf{F}=\mathbf{U}\operatorname{diag}(\sigma_0,\sigma_1,\sigma_2)\mathbf{V}^{\top}$，取对数主应变 $\boldsymbol{\varepsilon}=(\ln\sigma_0,\ln\sigma_1,\ln\sigma_2)^{\top}$ 及偏量 $\hat{\boldsymbol{\varepsilon}}=\boldsymbol{\varepsilon}-\frac{1}{3}\operatorname{tr}(\boldsymbol{\varepsilon})\mathbf{1}$。Drucker-Prager 屈服函数为：
+\begin{equation}
+\delta\gamma=\|\hat{\boldsymbol{\varepsilon}}\|+\frac{3\lambda+2\mu}{2\mu}\operatorname{tr}(\boldsymbol{\varepsilon})\cdot\alpha,\quad
+\alpha=\sqrt{\frac{2}{3}}\cdot\frac{2\sin\phi}{3-\sin\phi}
+\end{equation}
+其中 $\phi$ 为内摩擦角。当 $\delta\gamma\le0$ 时弹性，$\mathbf{F}_e=\mathbf{F}$；当 $\delta\gamma>0$ 且 $\operatorname{tr}(\boldsymbol{\varepsilon})>0$ 时拉伸崩溃，$\mathbf{F}_e=\mathbf{U}\mathbf{V}^{\top}$；当 $\delta\gamma>0$ 且 $\operatorname{tr}(\boldsymbol{\varepsilon})\le0$ 时按 $\mathbf{H}=\boldsymbol{\varepsilon}-\hat{\boldsymbol{\varepsilon}}\,\delta\gamma/\|\hat{\boldsymbol{\varepsilon}}\|$ 执行径向塑性流动，$\mathbf{F}_e=\mathbf{U}\operatorname{diag}(e^{H_0},e^{H_1},e^{H_2})\mathbf{V}^{\top}$。Kirchhoff 应力由 StVK 能量在主轴系导出：$\tau_i=2\mu\ln\sigma_i+\lambda\sum_j\ln\sigma_j$，经 $\boldsymbol{\tau}=\mathbf{U}\operatorname{diag}(\tau_0,\tau_1,\tau_2)\mathbf{V}^{\top}\mathbf{F}^{\top}$ 旋回世界坐标系。
 
-\textbf{脆性断裂求解器（solver\_id=7, 12）}：脆性断裂模型用于玻璃类材质。当某粒子达到断裂准则时，弹性模量 $\mu,\lambda$ 被置零，失去全部承载能力，模拟玻璃破碎后的离散碎片行为。
+\textbf{脆性断裂求解器}：脆性断裂模型用于玻璃类材质。由 $\mathbf{F}=\mathbf{U}\operatorname{diag}(\sigma_0,\sigma_1,\sigma_2)\mathbf{V}^{\top}$ 取对数应变 $\varepsilon_i=\ln(\max(\sigma_i,0.01))$，均量 $\varepsilon_m=\frac{1}{3}\sum\varepsilon_i$，偏应变量 $\boldsymbol{\varepsilon}_{\text{dev}}=(\varepsilon_0-\varepsilon_m,\varepsilon_1-\varepsilon_m,\varepsilon_2-\varepsilon_m)^{\top}$。断裂准则是基于等效偏应变的瞬时脆断判据：
+\begin{equation}
+\varepsilon_{\text{eq}}=\|\boldsymbol{\varepsilon}_{\text{dev}}\|=\sqrt{\sum_{i=0}^{2}(\varepsilon_i-\varepsilon_m)^2}
+\end{equation}
+当 $\varepsilon_{\text{eq}}>\varepsilon_{\text{crit}}$ 时，拉梅常数被置零（$\mu=0$，$\lambda=0$），粒子永久丧失全部承载能力，模拟玻璃破碎后的离散碎片行为；否则材料保持线弹性响应。
 
-\textbf{流体求解器（solver\_id=6）}：基于压力的弱可压缩流体模型。采用状态方程 $P=\kappa(1-1/J)$ 描述压强-密度关系，其中体积模量 $\kappa=\lambda+2\mu/3$，Kirchhoff 应力简化为各向同性压强项 $\boldsymbol{\tau}=-P\mathbf{I}$。
+\textbf{流体求解器}：基于压力的弱可压缩流体模型，采用状态方程 $P=\kappa(1-1/J)$ 描述压强-密度关系，其中体积模量 $\kappa=\lambda+2\mu/3$，Kirchhoff 应力简化为各向同性压强项 $\boldsymbol{\tau}=-P\mathbf{I}$。
 
-\textbf{木材各向异性求解器（solver\_id=8, 13）}：横观各向同性弹性模型。沿纹理方向（$+Y$）的剪切模量 $\mu_{\parallel}=2.5\mu$，垂直纹理方向 $\mu_{\perp}=0.6\mu$，模拟木材沿纹理方向的高刚度与垂直方向的低刚度特征。
+\textbf{木材各向异性求解器}：横观各向同性弹性模型，纹理方向取世界坐标系 $+Y$ 轴。以无穷小应变近似 $\boldsymbol{\varepsilon}=\frac{1}{2}(\mathbf{F}+\mathbf{F}^{\top})-\mathbf{I}$ 闭合求解，沿纹理方向与垂直纹理方向的剪切模量与各向同性基底存在比例关系 $\mu_{\parallel}=2.5\mu$，$\mu_{\perp}=0.6\mu$。Kirchhoff 应力为各向同性基底与轴向增强项的叠加：
+\begin{equation}
+\boldsymbol{\tau}=\left[2\mu_{\perp}\boldsymbol{\varepsilon}+\lambda\operatorname{tr}(\boldsymbol{\varepsilon})\mathbf{I}+2(\mu_{\parallel}-\mu_{\perp})\,\varepsilon_{yy}\,\operatorname{diag}(0,1,0)\right]\mathbf{F}^{\top}
+\end{equation}
+该模型模拟木材沿纹理方向的高刚度与垂直方向的低刚度特征，无塑性变形。
 
-\textbf{粘塑性求解器（solver\_id=3）}：StVK 粘塑性模型用于织物材质。结合率相关的粘塑性返回映射与 StVK 应力公式，模拟织物在弯曲和拉伸时的非线性响应与永久褶皱。
+\textbf{粘塑性求解器}：StVK 粘塑性模型用于织物材质。由 $\mathbf{F}=\mathbf{U}\operatorname{diag}(\sigma_0,\sigma_1,\sigma_2)\mathbf{V}^{\top}$ 取对数主应变 $\varepsilon_i=\ln\sigma_i$，StVK 弹性在主轴系下的 Kirchhoff 主应力为：
+\begin{equation}
+\tau_i=2\mu\varepsilon_i+\lambda\sum_j\varepsilon_j
+\end{equation}
+塑性部分采用 von Mises 屈服准则配合 Duvaut-Lions 粘塑性正则化。试探偏应力 $\mathbf{s}^{\text{trial}}=2\mu\hat{\boldsymbol{\varepsilon}}$（$\hat{\boldsymbol{\varepsilon}}$ 为偏应变），屈服函数 $y=\|\mathbf{s}^{\text{trial}}\|-\sqrt{2/3}\,\sigma_y$。当 $y>0$ 时，按率相关形式返回偏应力范数：
+\begin{equation}
+\|\mathbf{s}^{\text{new}}\|=\|\mathbf{s}^{\text{trial}}\|-\frac{y}{1+\eta/(2\hat{\mu}\,\mathrm{d}t)},\quad
+\hat{\mu}=\mu\cdot\frac{\sigma_0^2+\sigma_1^2+\sigma_2^2}{3}
+\end{equation}
+其中 $\eta$ 为塑性粘度，$\mathrm{d}t$ 为时间步长。速率极限下（$\eta\to0$），$\|\mathbf{s}^{\text{new}}\|$ 趋向 $\sqrt{2/3}\,\sigma_y$ 的经典率无关解；高粘度或小步长下退化为弹性。返回后的应变 $\boldsymbol{\varepsilon}^{\text{new}}=(2\mu)^{-1}\mathbf{s}^{\text{new}}+\frac{1}{3}\operatorname{tr}(\boldsymbol{\varepsilon})\mathbf{1}$ 经 $\mathbf{F}_e=\mathbf{U}\operatorname{diag}(e^{\varepsilon_0^{\text{new}}},e^{\varepsilon_1^{\text{new}}},e^{\varepsilon_2^{\text{new}}})\mathbf{V}^{\top}$ 恢复弹性变形梯度。该模型模拟织物在弯曲和拉伸时的非线性响应与永久褶皱。
 
 \subsection{材质标签到物理参数的映射}
 前景背景分离完成后，系统将逐高斯材质标签编码转换为物理参数。
 
-\textbf{物理参数经验初始化}：系统从 \texttt{material\_config.json}（v2.0）经验库中读取每种材质类别预定义的杨氏模量 $E$、泊松比 $\nu$ 与密度 $\rho$ 范围（见表~\ref{tab:material_params}），取vlm的预测值作为约束条件输出初始猜测。当启用 VLM 硬度等级预测时，系统以组合编码 $\texttt{composite\_id}=\texttt{material\_label}\times10+\texttt{grade\_idx}$ 进一步细分，依据 soft/medium/hard 三档经验值赋参。$E$ 初始值在写入 MPM 前除以 $10^7$ 缩放至求解器归一化范围，以适配 Warp 的数值精度需求；密度保持原始 kg/m$^3$ 量纲。泊松比被钳位至 $[-0.49, 0.49]$ 以避免 $\nu\to\pm0.5$ 时的体模量奇异性，SVD 运行时进一步收紧至 $[-0.49, 0.45]$。
+\textbf{物理参数经验初始化}：系统从 \texttt{material\_config.json} 经验库中读取每种材质类别预定义的杨氏模量 $E$、泊松比 $\nu$ 与密度 $\rho$ 范围（见表~\ref{tab:material_params}），取vlm的预测值作为约束条件输出初始猜测。当启用 VLM 硬度等级预测时，系统以组合编码 $\texttt{composite\_id}=\texttt{material\_label}\times10+\texttt{grade\_idx}$ 进一步细分，依据 soft/medium/hard 三档经验值赋参。$E$ 初始值在写入 MPM 前除以 $10^7$ 缩放至求解器归一化范围，以适配 Warp 的数值精度需求；密度保持原始 kg/m$^3$ 量纲。泊松比被钳位至 $[-0.49, 0.49]$ 以避免 $\nu\to\pm0.5$ 时的体模量奇异性，SVD 运行时进一步收紧至 $[-0.49, 0.45]$。
 
 \begin{table}[!htbp]
 \centering
@@ -80,9 +104,12 @@ Maxwell 粘弹性松弛通过指数衰减递推更新：
 
 \textbf{基于 CFL 条件的硬 E 上限}：在参数初始化阶段，系统以 CFL 安全系数 0.1 和硬性子步时长下限 $\mathrm{d}t_{\min}=2\times10^{-5}$\,s 为约束，推导各粒子杨氏模量的安全上限：
 \begin{equation}
-E_{\max}=\dfrac{v_{\text{wave}}^2\cdot\rho}{\max(\lambda/\mu+2,\;1)},\quad v_{\text{wave}}=\dfrac{0.1\cdot\mathrm{d}x}{\mathrm{d}t_{\min}}
+E_{\text{phys}}^{\max}=\dfrac{v_{\text{wave}}^2\rho}{\chi(\nu)},\quad
+E_{\text{solver}}^{\max}=\dfrac{E_{\text{phys}}^{\max}}{10^7},\quad
+v_{\text{wave}}=\dfrac{0.1\cdot\mathrm{d}x}{\mathrm{d}t_{\min}}
+\label{eq:cfl_initial_e_cap}
 \end{equation}
-其中波速因数 $\lambda/\mu+2$ 补偿近不可压缩材料（$\nu\to0.5$）的体波速放大——当 $\nu=0.49$ 时该因数可达约 12.5，对应波速约为简化估计 $\sqrt{E/\rho}$ 的 3.5 倍。仅当超限粒子占比低于 50\% 时执行硬截断，否则判定为全局参数偏好问题而不强制压缩。此机制从初始化阶段即保障所有粒子的波速落在 MPM 数值稳定性包络内。
+其中 $\chi(\nu)=\max\left(\dfrac{\nu}{(1+\nu)(1-2\nu)}+\dfrac{1}{1+\nu},\,1\right)$ 对应 $(\lambda+2\mu)/E$ 的无量纲波速因子，补偿近不可压缩材料（$\nu\to0.5$）的体波速放大；当 $\nu=0.49$ 时 $\chi(\nu)\approx17.1$，对应波速约为简化估计 $\sqrt{E/\rho}$ 的 4.1 倍。仅当超限粒子占比低于 50\% 时执行硬截断，否则判定为全局参数偏好问题而不强制压缩。此机制从初始化阶段即保障所有粒子的波速落在 MPM 数值稳定性包络内。
 
 \textbf{自适应网格尺寸}：系统依据激活前景点数量自适应选取网格间距：$N_{\text{fg}}<2\times10^5$ 时 $\mathrm{d}x=0.04$（$n_{\text{grid}}=50$），以上放宽至 0.05，$n_{\text{grid}}$ 硬上限 100。最终网格数取值为 $n_{\text{grid}}=\min\left(100,\;\max\left(50,\;\lceil1.5/\mathrm{d}x\rceil\right)\right)$。针对粒子填充密度阈值同样分级：$N_{\text{fg}}>5\times10^5$ 时采用较高的透明度阈值 0.10 以滤除稀疏渲染赘余，$N_{\text{fg}}>2\times10^5$ 时取 0.05，其余取 0.02。
 
@@ -110,11 +137,15 @@ VLM 提供的初始材质参数可能存在高达数量级的误差，加之优�
 \begin{equation}
 \mu_p=\dfrac{E_p\cdot10^7}{2(1+\nu_p)},\quad\lambda_p=\dfrac{E_p\cdot10^7\cdot\nu_p}{(1+\nu_p)(1-2\nu_p)},\quad v_p=\sqrt{\dfrac{\max(\lambda_p+2\mu_p,\;E_p\cdot10^7)}{\rho_p}}
 \end{equation}
-取全局最大波速 $v_{\max}$，安全子步长 $\mathrm{d}t_{\text{safe}}=0.1\cdot\mathrm{d}x/v_{\max}$。最终子步长经对齐至帧间隔：$\mathrm{d}t_{\text{sub}}=\mathrm{d}t_{\text{frame}}/\lceil\mathrm{d}t_{\text{frame}}/\operatorname{clamp}(\mathrm{d}t_{\text{safe}},\;5\times10^{-6},\;10^{-4},\;\mathrm{d}t_{\text{frame}})\rceil$。此机制在金属-橡胶耦合仿真中自动为高波速金属子域匹配更小时步，防止波速溢出。
+取全局最大波速 $v_{\max}$，安全子步长 $\mathrm{d}t_{\text{safe}}=0.1\cdot\mathrm{d}x/v_{\max}$。最终子步长先限制到数值区间 $\widetilde{\mathrm{d}t}=\min\!\left(\mathrm{d}t_{\text{frame}},\;\mathrm{d}t_{\max},\;\max(\mathrm{d}t_{\text{safe}},\;\mathrm{d}t_{\text{floor}})\right)$，其中 $\mathrm{d}t_{\text{floor}}=5\times10^{-6}$\,s，$\mathrm{d}t_{\max}=10^{-4}$\,s；随后对齐至帧间隔：
+\begin{equation}
+\mathrm{d}t_{\text{sub}}=\frac{\mathrm{d}t_{\text{frame}}}{\left\lceil\mathrm{d}t_{\text{frame}}/\widetilde{\mathrm{d}t}\right\rceil}
+\end{equation}
+此机制在金属-橡胶耦合仿真中自动为高波速金属子域匹配更小时步，防止波速溢出。
 
 \textbf{逐粒子 CFL E 钳位}：每次梯度更新后，系统调用 `\_clamp\_E\_to\_cfl\_limit` 对全体粒子执行逐粒子 CFL 安全检查。各粒子根据自身密度 $\rho_p$ 与泊松比 $\nu_p$ 独立计算安全上限：
 \begin{equation}
-E_p^{\max}=\dfrac{(0.1\cdot\mathrm{d}x/\mathrm{d}t_{\text{sub}})^2\cdot\rho_p}{10^7\cdot\max(\lambda_p/\mu_p+2,\;1)}
+E_{p,\text{solver}}^{\max}=\dfrac{(0.1\cdot\mathrm{d}x/\mathrm{d}t_{\text{sub}})^2\rho_p}{10^7\cdot\chi(\nu_p)}
 \end{equation}
 低密度或高泊松比的粒子自动获得更低的 $E$ 钳位值，等价于为该类粒子强制执行更保守的波速约束。超限粒子的 $E$ 被截断至安全值并记录钳位计数。避免 SDS 梯度将某区域 $E$ 推向物理上合理但数值上危险的区间。
 

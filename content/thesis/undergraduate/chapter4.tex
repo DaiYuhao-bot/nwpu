@@ -2,7 +2,7 @@
 
 \section{引言}
 在上一章中，系统基于视觉语言大模型和深度分层技术，完成了二维平面下的细粒度实例掩码提取与基础本构属性映射，并获得了带有空间位姿信息的初始点云。然而，对于后续的三维物理仿真（如物质点法）而言，纯粹的二维掩码和稀疏离散点云并不足以支撑连续、高保真的几何碰撞与材质运算。这就要求我们将从多重视图和二维基础模型中提取到的高维特征，精确且稳定地投影到具有明确几何体积的三维表征之中。
-为此，本文系统以三维高斯溅射（3D Gaussian Splatting, 3DGS）\cite{3dgs}为三维表征，基于 Feature Splatting\cite{featuresplatting}的框架采用了联合语言先验与视觉几何先验的特征蒸馏方案，其流程如图~\ref{fig:feature_spaltting}所示。本章依次阐述高斯原语中特征向量的嵌入方式、二维视觉特征预提取流程、特征蒸馏方法的互补机制与损失设计，以及面向物理仿真的材质分类与前景背景分割框架。
+为此，本文系统以三维高斯溅射（3D Gaussian Splatting, 3DGS）\cite{3dgs}为三维表征，基于 Feature Splatting\cite{featuresplatting}的框架采用了联合语言先验与视觉几何先验的特征蒸馏方案，其流程如图~\ref{fig:feature_splatting}所示。本章依次阐述高斯原语中特征向量的嵌入方式、二维视觉特征预提取流程、特征蒸馏方法的互补机制与损失设计，以及面向物理仿真的材质分类与前景背景分割框架。
 
 \begin{figure}[!htbp]
     \centering
@@ -17,7 +17,7 @@
 
 \textbf{视觉蒸馏特征（Distilled Visual Features）}：存储从 CLIP\cite{clip}与 DINO\cite{dino}视觉基础模型中蒸馏提取的跨模态语义与细粒度几何特征，并进一步扩展为部件级（part-level）视觉蒸馏特征通道，以支持更细粒度的物体分区表征。
 
-\textbf{材质语义标签（Material Semantic Labels）}：存储 VLM（Qwen3-VL-32B）\cite{qwen25vl}对场景各区域推理预测的材质类别标签，经材质语义标签蒸馏后同步映射至三维高斯空间，使每个高斯原语明确归属到具体的材质大类（如刚体、弹性体、织物等）。
+\textbf{材质语义标签（Material Semantic Labels）}：存储 VLM（Qwen3-VL-32B）\cite{qwen3vl}对场景各区域推理预测的材质类别标签，经材质语义标签蒸馏后同步映射至三维高斯空间，使每个高斯原语明确归属到具体的材质大类（如刚体、弹性体、织物等）。
 
 在正向渲染过程中，这两组蒸馏通道与传统光栅化的颜色共享同一组 $\alpha$-blending 权重与透射率积分，各自通过独立的轻量级解码器分别输出重建的视觉特征图与材质分类 logits。视觉蒸馏特征以 CLIP/DINO 预提取的多视特征图为监督目标计算余弦相似度损失，材质语义标签以 VLM 材质分类标签为监督目标计算交叉熵损失，两组通道在统一的高斯训练框架下各自收敛至对应的二维监督信号。
 
@@ -27,7 +27,7 @@
 在将特征蒸馏至高斯原语之前，系统需先从原始多视角图像中提取高质量的多层级视觉特征作为监督目标。该预处理阶段由 \nolinkurl{compute_obj_part_feature.py} 模块独立完成，为后续的 Feature-Splatting 训练提供三类互补的视觉特征信号。
 
 \subsection{对象级与零件级 CLIP 特征}
-在第三章所述的 YOLO-MobileSAMv2\cite{yolov8,mobilesam}检测-分割管线基础上，特征提取模块进一步将掩码用于语义特征的聚合与增强。CLIP 特征的提取分为两个层次：
+在 YOLO-MobileSAMv2\cite{yolov8,mobilesam} 检测-分割管线基础上，特征提取模块进一步将掩码用于语义特征的聚合与增强。CLIP 特征的提取分为两个层次：
 \textbf{对象级特征（Object-level Features）}：将整帧图像送入 CLIP ViT-L/14 编码器（输入分辨率 336 像素），获取保留空间布局的 patch-level 特征图（维度 $C \times H_{\text{patch}} \times W_{\text{patch}}$）。随后利用 YOLO-MobileSAMv2 获得的实例掩码对特征图进行空间掩码平均池化，得到每个检测对象的全局语义特征向量。
 
 \textbf{零件级特征（Part-level Features）}：当系统配置为 \texttt{clip\_part} 模式时，对 YOLO 检测出的每个包围盒区域单独裁剪，缩放至统一分辨率后独立编码，获得零件级的局部语义特征；将各包围盒特征按空间位置回贴至图像网格中，形成保留细粒度材质分区的零件级特征图。两种特征经维度级联后统一通过双线性插值降维至蒸馏特征维度（默认 32 维）。
@@ -164,16 +164,16 @@ w_{\mathbf{p}} =
 为确保每个三维高斯原语在空间中维持统一的物理材质归属，将二维语义标签沿光栅化路径反向投影至各高斯原语进行投票监督：
 
 \begin{equation}
-\mathcal{L}_{\text{gs}} = \frac{1}{\sum_{k\in\mathcal{K}} |\mathcal{V}_k|} \sum_{k \in \mathcal{K}} \sum_{\mathbf{p} \in \mathcal{V}_k} \alpha_{k,\mathbf{p}} \cdot \mathrm{CE}\!\left( \mathrm{dec}\big( \mathbf{f}_k^{\text{sem}} \big),\; y_{\mathbf{p}} \right)
+\mathcal{L}_{\text{gs}} = \frac{1}{\sum_{k\in\mathcal{K}^{+}} q_k} \sum_{k \in \mathcal{K}^{+}} q_k \cdot \mathrm{CE}\!\left( \mathrm{dec}\big( \mathbf{f}_k^{\text{sem}} \big),\; y_k^{*} \right)
 \label{eq:gs_consistency}
 \end{equation}
 
-其中 $\mathcal{K}$ 为当前视点下参与渲染的高斯原语集合，$\mathcal{V}_k$ 为经高斯 $k$ 光栅化的像素索引集，$\mathbf{f}_k^{\text{sem}}$ 为高斯 $k$ 的独立语义蒸馏特征，$\mathrm{dec}(\cdot)$ 为语义标签解码器，$\alpha_{k,\mathbf{p}}$ 为该像素处高斯 $k$ 的 $\alpha$-blending 权重。该损失延迟至训练 $25{,}000$ 次迭代后接入，并以 $5{,}000$ 次线性预热启动；最小投票数为 $2$，最小置信度阈值为 $0.55$。
+其中 $\mathcal{K}^{+}$ 为经投票筛选后的高斯集合，$y_k^{*}$ 为二维像素标签反投影至高斯 $k$ 后的多数投票类别，$q_k$ 为该多数类别的投票置信度，$\mathbf{f}_k^{\text{sem}}$ 为高斯 $k$ 的独立语义蒸馏特征，$\mathrm{dec}(\cdot)$ 为语义标签解码器。该损失延迟至训练 $25{,}000$ 次迭代后接入，并以 $5{,}000$ 次线性预热启动；最小投票数为 $2$，最小置信度阈值为 $0.55$。
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{vase_feature_map.png}
-    \caption{花瓶场景的特征蒸馏与材质标签蒸馏结果。第一行为监督目标（GT），第二行为三维高斯解码后的预测结果（Pred）；三列从左至右分别对应 CLIP 特征、DINO 特征和材质标签。其中，结果表明，预测结果与监督目标在主体轮廓、局部结构和材质分区上保持了较高一致性。}
+    \includegraphics[width=\linewidth]{vase_soccer_feature_map.png}
+    \caption{花瓶与足球场景的特征蒸馏与材质标签蒸馏结果。前两行为花瓶场景，后两行为足球场景；每个场景中第一行为监督目标（GT），第二行为三维高斯解码后的预测结果（Pred）；三列从左至右分别对应 CLIP 特征、DINO 特征和材质标签。结果表明，预测结果与监督目标在主体轮廓、局部结构和材质分区上保持了较高一致性。}
     \label{fig:vase_feature_map}
 \end{figure}
 
