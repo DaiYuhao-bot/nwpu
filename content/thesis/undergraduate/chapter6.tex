@@ -17,17 +17,17 @@
 
 \textbf{预重建对比场景}：该类场景使用已有三维高斯重建结果，避免生成阶段差异对仿真评测造成干扰。实验重点考察在相同静态三维表示下，不同物理参数设置对最终运动质量的影响，与人工赋参、仅经验初始化以及 SVD 优化后的结果进行横向比较。
 
-所有场景均遵循统一的实验流程：首先进行物理参数初始化与前景背景解耦，然后执行 MPM\cite{mpm} 物理仿真并渲染输出视频序列，最终通过 VBench 评测框架与空间--时间切片工具进行自动化评估。
+所有场景均遵循统一的实验流程：首先进行物理参数初始化与前景背景解耦，然后执行 MPM\cite{mpm} 物理仿真并渲染输出视频序列，最终通过 VBench 评测框架与空间--时间切片工具进行自动化评估。定量表格中的各项分数由相同视频长度、相同分辨率和相同评价脚本计算后取平均，以保证不同方法之间的输入条件一致。
 
 \subsection{对比方法}
-为全面评估本文方法的有效性，选取了以下代表性方法进行对比实验。\textbf{PhysDreamer}\cite{physdreamer} 利用预生成的视频作为真实参考来监督物理参数学习，本文在此基础上引入 SVD 图像到视频扩散模型进行扩散先验蒸馏优化，避免了预生成视频质量不稳定的问题。\textbf{PhysGaussian}\cite{physgaussian} 基于物质点法（MPM）物理仿真的三维高斯泼溅方法，将有限元形变建模直接应用于 3D 高斯核的运动预测，其物理参数（如杨氏模量等）需手动设定。\textbf{DreamGaussian4D}\cite{dreamgaussian4d} 基于视频扩散模型蒸馏的四维生成方法，通过预测 3D 高斯的时间相关形变来生成动态内容，不依赖显式物理约束。此外设置 \textbf{Ours(without svd)} 和 \textbf{Ours(with svd)} 两种变体，分别对应本文方法在无 SVD 视频扩散先验优化与有 SVD 优化条件下的表现，用于消融验证视频先验对物理参数的优化效果。
+为全面评估本文方法的有效性，选取了以下代表性方法进行对比实验。PhysDreamer\cite{physdreamer} 利用预生成的视频作为真实参考来监督物理参数学习，本文在此基础上引入 SVD 图像到视频扩散模型进行扩散先验蒸馏优化，避免了预生成视频质量不稳定的问题。PhysGaussian\cite{physgaussian} 作为基于物质点法物理仿真的三维高斯动态基线，将有限元形变建模直接应用于 3D 高斯核的运动预测，其物理参数如杨氏模量等需手动设定。DreamGaussian4D\cite{dreamgaussian4d} 基于视频扩散模型蒸馏的四维生成方法，通过预测 3D 高斯的时间相关形变来生成动态内容，不依赖显式物理约束。此外设置 Ours(without svd) 和 Ours(with svd) 两种变体，分别对应本文方法在无 SVD 视频扩散先验优化与有 SVD 优化条件下的表现，用于消融验证视频先验对物理参数的优化效果。
 
 \section{评价指标与评测流程}
 
 \subsection{VBench 指标}
 VBench 是面向视频生成任务的自动化评测基准，能够从多个维度对生成视频的质量进行系统评分。本章采用 VBench 的五个维度进行评估：
 
-\textbf{Subject Consistency} 评估视频中主体对象在时间维度上的外观稳定性，通过提取各帧的 DINOv2 特征并计算帧间余弦相似度来衡量。\textbf{Background Consistency} 评估视频背景在时间轴上的一致性，通过比较相邻帧背景区域的 CLIP 特征相似度来计算。\textbf{Motion Smoothness} 评估视频中运动轨迹的连续性和平滑程度，通过分析光流场的时间一致性来衡量。\textbf{Aesthetic Quality} 对视频帧进行美学评分（0--10 分），评估生成视频的视觉美观度和自然度。\textbf{Imaging Quality} 评估生成视频的成像保真度，涵盖画面失真、压缩伪影等因素的综合评价。
+Subject Consistency 评估视频中主体对象在时间维度上的外观稳定性，通过提取各帧的 DINOv2 特征并计算帧间余弦相似度来衡量。Background Consistency 评估视频背景在时间轴上的一致性，通过比较相邻帧背景区域的 CLIP 特征相似度来计算。Motion Smoothness 评估视频中运动轨迹的连续性和平滑程度，通过分析光流场的时间一致性来衡量。Aesthetic Quality 对视频帧进行 0--10 分的美学评分，评估生成视频的视觉美观度和自然度。Imaging Quality 评估生成视频的成像保真度，涵盖画面失真、压缩伪影等因素的综合评价。
 
 
 \subsection{空间--时间切片}
@@ -35,8 +35,7 @@ VBench 是面向视频生成任务的自动化评测基准，能够从多个维�
 
 \section{定量结果与分析}
 
-\subsection{总体性能对比}
-表~\ref{tab:vbench_main} 展示了不同方法在 VBench 五个评价维度上的量化对比结果。所有指标均为越高越优（$\uparrow$），\textbf{加粗}表示最优值，\underline{下划线}表示次优值。
+表~\ref{tab:vbench_main} 展示了不同方法在 VBench 五个评价维度上的量化对比结果。所有指标均为越高越优（$\uparrow$），\textbf{加粗}表示最优值，\underline{下划线}表示次优值。为降低单个场景或单条运动轨迹对评分的偶然影响，表中结果采用统一场景集合下的平均分；空间--时间切片进一步用于解释 VBench 难以直接反映的局部运动差异。
 
 \begin{table}[!htbp]
     \centering
@@ -55,71 +54,94 @@ VBench 是面向视频生成任务的自动化评测基准，能够从多个维�
     \end{tabular}
 \end{table}
 
-\subsection{结果分析}
-
-PhysDreamer 在 Background Consistency 和 Motion Smoothness 上均取得最优，在 Subject Consistency 上以次优紧随 DreamGaussian4D。DreamGaussian4D 的 Subject Consistency 虽最高，但其形变预测趋于静态，近乎静止的帧序列天然利好该指标，纯形变方法在 Aesthetic Quality 和 Imaging Quality 上均最低，表明缺乏物理约束的视频在视觉自然度和成像保真度上不及物理仿真方法。本文方法在 Aesthetic Quality 和 Imaging Quality 上包揽前两名，SVD 优化带来了可观察的正向增益。PhysGaussian 排名整体靠后，手动赋参引发的非预期形变同时损害了背景稳定性和主体一致性。与 DreamPhysics\cite{dreamphysics} 仅以 Aesthetic Quality 为量化指标的评估范式相比，本文扩展至五个 VBench 维度，覆盖了更全面的质量维度。
+PhysDreamer 在 Background Consistency 和 Motion Smoothness 上均取得最优，在 Subject Consistency 上以次优紧随 DreamGaussian4D。DreamGaussian4D 的 Subject Consistency 虽最高，但其形变预测趋于静态，近乎静止的帧序列天然利好该指标，纯形变方法在 Aesthetic Quality 和 Imaging Quality 上均最低，表明缺乏物理约束的视频在视觉自然度和成像保真度上不及物理仿真方法。本文方法在 Aesthetic Quality 和 Imaging Quality 上包揽前两名，SVD 优化带来了可观察的正向增益。PhysGaussian 排名整体靠后，手动赋参引发的非预期形变同时损害了背景稳定性和主体一致性。与 DreamPhysics\cite{dreamphysics} 仅以 Aesthetic Quality 为量化指标的评估范式相比，本文扩展至五个 VBench 维度，覆盖了更全面的质量维度。需要指出的是，VBench 本身更偏向视频生成质量评价，不能单独证明物理参数的绝对真实性，因此本文将该指标与空间--时间切片共同使用。
 
 
 \section{空间--时间切片分析}
 
-空间--时间切片对比展示了不同方法在典型场景上的运动轨迹差异。切片图中的横轴为空间位置，纵轴为时间。为保证可比性，同一场景不同方法使用相同采样线、相同视频长度和相同帧率。
+空间--时间切片对比展示了不同方法在典型场景上的运动轨迹差异。切片图中的横轴为空间位置，纵轴为时间。为保证可比性，同一场景不同方法使用相同采样线、相同视频长度和相同帧率。本文将采样线位置与对应的空间--时间切片结果组合展示，以便直接对照采样区域和切片轨迹。
 
 \begin{figure}[!htbp]
     \centering
-    \begin{subfigure}[t]{0.92\textwidth}
+    \begin{subfigure}[t]{0.78\textwidth}
         \centering
-        \includegraphics[width=\linewidth]{alocasia_xt_slice_line270.png}
-        \caption{未引入 SVD 优化}
+        \includegraphics[width=\linewidth]{alocasia_sample_line.png}
+        \caption{采样线位置}
     \end{subfigure}
 
-    \begin{subfigure}[t]{0.92\textwidth}
+    \vspace{0.6em}
+
+    \begin{subfigure}[t]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{alocasia_xt_slice_line270.png}
+        \caption{X-t，未引入 SVD}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
         \centering
         \includegraphics[width=\linewidth]{alocasia_xt_slice_line270_svd.png}
-        \caption{引入 SVD 优化}
+        \caption{X-t，引入 SVD}
     \end{subfigure}
-    \caption{Alocasia 场景的 X-t 切片对比（采样线 270）}
+
+    \vspace{0.6em}
+
+    \begin{subfigure}[t]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{alocasia_yt_slice_line640.png}
+        \caption{Y-t，未引入 SVD}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{alocasia_yt_slice_line640_svd.png}
+        \caption{Y-t，引入 SVD}
+    \end{subfigure}
+    \caption{Alocasia 场景采样线位置与空间--时间切片对比（X-t 采样线 270，Y-t 采样线 640）}
     \label{fig:svd_slice_alocasia}
 \end{figure}
 
-Alocasia 场景的采样线穿过叶片与叶柄区域。未引入 SVD 优化时，叶片边界的时间轨迹相对集中，运动幅度和柔性形变不足；引入 SVD 后，叶片纹理在时间轴上形成更连续、更宽的弯曲轨迹，位移呈现出由根部约束向叶片自由端扩散的趋势。视频先验倾向于降低柔性植物部件的有效刚度，使其产生更符合薄片状植物材料的摆动与回弹。
+Alocasia 场景的采样线覆盖叶片、叶柄及相邻背景。裁剪后的 X-t 切片保留 $200$--$1200$ 的主要空间区间，去除了两侧大面积静态背景后，叶片边界的时序差异更清晰。未引入 SVD 时，叶片纹理在时间方向上基本呈窄带分布，边界位移有限；引入 SVD 后，叶片与叶柄附近的纹理轨迹明显变宽，并形成连续的斜向弯曲，说明优化后的物理参数允许柔性部件产生更大的局部摆动。Y-t 切片保留 $0$--$700$ 的有效区域后，可见叶片纵向纹理在优化后出现更明显的弯折和回弹，而右侧背景条纹仍保持近似竖直。该现象表明视频先验主要修正前景植物部件的等效刚度，没有引入显著的全局背景漂移。
 
 \begin{figure}[!htbp]
     \centering
-    \begin{subfigure}[t]{0.92\textwidth}
+    \begin{subfigure}[t]{0.78\textwidth}
         \centering
-        \includegraphics[width=\linewidth]{tree_xt_slice_line150.png}
-        \caption{未引入 SVD 优化}
+        \includegraphics[width=\linewidth]{telephone_sample_line.png}
+        \caption{采样线位置}
     \end{subfigure}
 
-    \begin{subfigure}[t]{0.92\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{tree_xt_slice_line150_svd.png}
-        \caption{引入 SVD 优化}
-    \end{subfigure}
-    \caption{Tree 场景的 X-t 切片对比（采样线 150）}
-    \label{fig:svd_slice_tree}
-\end{figure}
+    \vspace{0.6em}
 
-Tree 场景同样体现了植物类柔性结构在视频先验优化前后的差异。未引入 SVD 时，树冠和枝条区域的切片轨迹接近静止或小幅扰动；引入 SVD 后，局部纹理在时间轴上形成更清晰的连续弯曲轨迹，优化后的参数更倾向于表达枝叶随外力摆动并逐渐回弹的柔性响应。
-
-\begin{figure}[!htbp]
-    \centering
-    \begin{subfigure}[t]{0.92\textwidth}
+    \begin{subfigure}[t]{0.49\textwidth}
         \centering
         \includegraphics[width=\linewidth]{telephone_xt_slice_line600.png}
-        \caption{未引入 SVD 优化}
+        \caption{X-t，未引入 SVD}
     \end{subfigure}
-
-    \begin{subfigure}[t]{0.92\textwidth}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
         \centering
         \includegraphics[width=\linewidth]{telephone_xt_slice_line600_svd.png}
-        \caption{引入 SVD 优化}
+        \caption{X-t，引入 SVD}
     \end{subfigure}
-    \caption{Telephone 场景的 X-t 切片对比（采样线 600）}
+
+    \vspace{0.6em}
+
+    \begin{subfigure}[t]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{telephone_yt_slice_line670.png}
+        \caption{Y-t，未引入 SVD}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{telephone_yt_slice_line670_svd.png}
+        \caption{Y-t，引入 SVD}
+    \end{subfigure}
+    \caption{Telephone 场景采样线位置与空间--时间切片对比（X-t 采样线 600，Y-t 采样线 670）}
     \label{fig:svd_slice_telephone}
 \end{figure}
 
-Telephone 场景呈现出不同的优化方向。采样线穿过电话线及其邻近背景区域，未引入 SVD 时，电话线切片中主要边界近似竖直，运动响应不足；经过 SVD 优化后，螺旋线局部出现向右偏移并逐渐回弹的斜向轨迹，而墙面、门板等背景纹理仍保持近似竖直。SVD 优化并未简单放大全局运动，而是结合材质初始化与前景解耦，将优化集中到电话线这类具有弹性形变潜力的区域。三类场景的对比表明，同一视频先验在不同材质上会诱导不同的物理参数修正方向：植物叶片偏向柔性摆动，螺旋电话线偏向局部弹性拉伸与回弹。
+Telephone 场景的采样线穿过螺旋电话线及其邻近墙面背景。裁剪后的 X-t 切片集中在 $200$--$1000$ 的有效空间范围内，保留了电话线主体和相邻静态纹理。未引入 SVD 时，电话线附近的边界整体接近竖直，说明运动响应较弱；引入 SVD 后，螺旋线区域出现局部斜向轨迹，并在后续帧中逐渐回到稳定位置，表现出弹性拉伸与回弹特征。Y-t 切片保留 $0$--$700$ 的空间区间后，电话线在垂直方向上的细密纹理变化更加突出，优化后的轨迹相较基线更连续、更弯曲，而墙面和门框等背景结构仍保持稳定。与 Alocasia 场景相比，该场景中的优化并未诱导大范围柔性摆动，而是集中在细长弹性结构的局部形变上，体现了材质初始化和视频先验共同约束下的区域选择性。
 
 
 \section{评测局限性}
@@ -130,7 +152,7 @@ Telephone 场景呈现出不同的优化方向。采样线穿过电话线及其�
 
 \section{本章小结}
 
-本章采用 VBench 视频生成基准评测框架对 PhysDreamer、PhysGaussian、DreamGaussian4D 以及本文方法生成的动态三维视频进行了多维度定量评估。实验结果表明，基于 SVD 扩散先验蒸馏优化后的物理参数能够在生成合理运动的前提下，获得更高的 Subject Consistency、Background Consistency 与 Motion Smoothness。
+本章采用 VBench 视频生成基准评测框架对 PhysDreamer、PhysGaussian、DreamGaussian4D 以及本文方法生成的动态三维视频进行了多维度定量评估。实验结果表明，基于 SVD 扩散先验蒸馏优化后的物理参数能够在生成合理运动的前提下，维持稳定的主体外观、背景一致性与运动连续性。
 
 在五个 VBench 维度中，PhysDreamer 在 Background Consistency 和 Motion Smoothness 上取得最优，在 Subject Consistency 上取得次优。本文方法在 Aesthetic Quality 和 Imaging Quality 上均取得最优。PhysGaussian 的手动赋参与 DreamGaussian4D 的纯形变预测分别代表了运动幅度过激与过于保守的两个极端，从不同侧面说明了本文结合 VLM 自动材质推理、前景背景解耦与 SVD 视频先验优化这一完整链路的价值。
 

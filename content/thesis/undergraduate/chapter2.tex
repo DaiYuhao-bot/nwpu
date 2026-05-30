@@ -2,13 +2,20 @@
 
 \section{引言}
 
-本章围绕论文系统涉及的核心技术，对相关理论基础进行阐述。沿着三维场景表征、视觉语义理解、连续介质仿真与视频生成的主线，分别介绍神经辐射场与三维高斯溅射的渲染理论、SAM 与视觉语言大模型的基本架构、物质点法（MPM）数值求解框架及视频扩散模型原理。
+本章围绕论文系统涉及的核心技术，对相关理论基础进行阐述。沿着三维场景表征、视觉语义理解、连续介质仿真与视频生成的主线，分别介绍神经辐射场与三维高斯溅射的渲染理论、SAM 与视觉语言大模型的基本架构、物质点法数值求解框架及视频扩散模型原理。
 
 \section{三维场景表征与渲染}
 
 \subsection{神经辐射场（NeRF）}
 
-神经辐射场（Neural Radiance Fields, NeRF）由 Mildenhall 等人于 2020 年提出\cite{nerf}，是一种基于隐式神经表示的三维场景新视角合成方法。其核心思想是将三维场景表示为一个连续函数 $F_\Theta: (\mathbf{x}, \mathbf{d}) \to (\mathbf{c}, \sigma)$，该函数由 MLP 参数化，输入空间坐标 $\mathbf{x} = (x, y, z)$ 与观测方向 $\mathbf{d} = (\theta, \phi)$，输出该点的颜色值 $\mathbf{c} = (r, g, b)$ 和体密度 $\sigma$。
+神经辐射场（Neural Radiance Fields, NeRF）由 Mildenhall 等人于 2020 年提出\cite{nerf}，是一种基于隐式神经表示的三维场景新视角合成方法。其核心思想是将三维场景表示为一个连续函数 $F_\Theta: (\mathbf{x}, \mathbf{d}) \to (\mathbf{c}, \sigma)$，该函数由 MLP 参数化，输入空间坐标 $\mathbf{x} = (x, y, z)$ 与观测方向 $\mathbf{d} = (\theta, \phi)$，输出该点的颜色值 $\mathbf{c} = (r, g, b)$ 和体密度 $\sigma$，整体流程如图~\ref{fig:nerf_pipeline}所示。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{Nerf.png}
+    \caption{NeRF 方法整体流程示意图（引自文献\cite{nerf}）}
+    \label{fig:nerf_pipeline}
+\end{figure}
 
 在渲染层面，NeRF 采用体渲染（Volume Rendering）方程沿光线积分计算像素颜色。对于从相机光心 $\mathbf{o}$ 沿方向 $\mathbf{d}$ 发出的光线 $\mathbf{r}(t) = \mathbf{o} + t\mathbf{d}$，其期望颜色 $\hat{C}(\mathbf{r})$ 由下式给出：
 
@@ -36,7 +43,16 @@ NeRF 通过最小化渲染图像与真实图像之间的光度损失进行端到
 
 三维高斯溅射（3D Gaussian Splatting, 3DGS）由 Kerbl 等人于 2023 年提出\cite{3dgs}。3DGS 将场景显式表征为一组各向异性三维高斯椭球体的集合，每个高斯基元 $G_k$ 由以下参数完整定义：
 
-每个高斯基元 $G_k$ 由中心位置（均值）$\boldsymbol{\mu}_k \in \mathbb{R}^3$、约束为正定矩阵的协方差矩阵 $\Sigma_k \in \mathbb{R}^{3 \times 3}$、不透明度 $\alpha_k \in [0, 1]$ 以及用于编码视角相关颜色外观的球谐系数（SH coefficients）完整定义。
+每个高斯基元 $G_k$ 由中心位置 $\boldsymbol{\mu}_k \in \mathbb{R}^3$、约束为正定矩阵的协方差矩阵 $\Sigma_k \in \mathbb{R}^{3 \times 3}$、不透明度 $\alpha_k \in [0, 1]$ 以及用于编码视角相关颜色外观的球谐系数（SH coefficients）完整定义。
+
+3DGS 的整体优化流程如图~\ref{fig:3dgs_pipeline}~所示，其从 SfM 点云初始化三维高斯集合，通过相机投影与可微 Tile Rasterizer 渲染图像，并利用图像重建误差反向传播更新高斯参数与自适应密度控制模块。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{3DGS.png}
+    \caption{3DGS 方法整体流程示意图（引自文献\cite{3dgs}）}
+    \label{fig:3dgs_pipeline}
+\end{figure}
 
 三维高斯函数在空间点 $\mathbf{x}$ 处的响应值定义为：
 
@@ -78,7 +94,7 @@ Segment Anything Model（SAM）由 Kirillov 等人于 2023 年提出\cite{sam}�
 
 SAM 的架构由三个核心组件构成：
 
-\textbf{图像编码器（Image Encoder）} 基于 Vision Transformer（ViT）架构，将输入图像编码为高维特征图，使用 MAE（Masked Autoencoder）\cite{mae} 预训练的 ViT-H 作为主干网络，输出 $64 \times 64$ 分辨率的特征嵌入。\textbf{提示编码器（Prompt Encoder）} 接收用户输入的提示信息，将稀疏提示（点/框）编码为位置嵌入，将稠密提示（掩码）通过卷积编码后与图像特征融合。\textbf{掩码解码器（Mask Decoder）} 基于轻量级 Transformer 结构，在图像嵌入与提示嵌入之间执行交叉注意力，输出分割掩码及其置信度分数。
+图像编码器（Image Encoder）基于 Vision Transformer（ViT）架构，将输入图像编码为高维特征图，使用 MAE（Masked Autoencoder）\cite{mae} 预训练的 ViT-H 作为主干网络，输出 $64 \times 64$ 分辨率的特征嵌入。提示编码器（Prompt Encoder）接收用户输入的提示信息，将点或框形式的稀疏提示编码为位置嵌入，将掩码形式的稠密提示通过卷积编码后与图像特征融合。掩码解码器（Mask Decoder）基于轻量级 Transformer 结构，在图像嵌入与提示嵌入之间执行交叉注意力，输出分割掩码及其置信度分数。
 
 在本文系统中，SAM 被用于对 FlashWorld 生成的多视角场景渲染图进行自动前景分割。系统采用自动提示模式，通过均匀网格点采样生成大量候选掩码，再经非极大抑制与置信度筛选获得最终分割结果，为后续深度分层和 VLM 材质识别提供基础掩码输入。
 
@@ -86,7 +102,7 @@ SAM 的架构由三个核心组件构成：
 
 视觉语言大模型是实现跨模态语义理解的核心基础。在本文系统中，该类模型在两个关键环节发挥作用：一是在特征蒸馏阶段通过 CLIP 提取图像语义特征，为特征蒸馏阶段提供监督信号；二是在材质识别阶段通过 VLM 对分割区域进行材质类别预测。
 
-\textbf{对比语言-图像预训练模型（CLIP）。}CLIP 由 Radford 等人于 2021 年提出\cite{clip}，通过大规模图像-文本对的对比学习，将视觉表征与自然语言语义对齐到统一的嵌入空间。CLIP 采用双编码器架构，图像编码器 $f_I$ 与文本编码器 $f_T$ 分别将图像 $I$ 和文本 $T$ 映射为归一化特征向量 $\mathbf{z}^I$、$\mathbf{z}^T$，并通过对称对比损失（InfoNCE）最大化匹配对的余弦相似度，同时推远不匹配对：
+\textbf{对比语言-图像预训练模型（CLIP）：}CLIP 由 Radford 等人于 2021 年提出\cite{clip}，通过大规模图像-文本对的对比学习，将视觉表征与自然语言语义对齐到统一的嵌入空间。CLIP 采用双编码器架构，图像编码器 $f_I$ 与文本编码器 $f_T$ 分别将图像 $I$ 和文本 $T$ 映射为归一化特征向量 $\mathbf{z}^I$、$\mathbf{z}^T$，并通过对称对比损失（InfoNCE）最大化匹配对的余弦相似度，同时推远不匹配对：
 
 \begin{equation}
 \mathcal{L}_{\text{CLIP}} = -\frac{1}{2N} \sum_{i=1}^{N} \left( \log \frac{e^{\mathbf{z}_i^I \cdot \mathbf{z}_i^T / \tau}}{\sum_j e^{\mathbf{z}_i^I \cdot \mathbf{z}_j^T / \tau}} + \log \frac{e^{\mathbf{z}_i^T \cdot \mathbf{z}_i^I / \tau}}{\sum_j e^{\mathbf{z}_i^T \cdot \mathbf{z}_j^I / \tau}} \right)
@@ -94,9 +110,9 @@ SAM 的架构由三个核心组件构成：
 
 其中 $\tau$ 为可学习的温度参数，$N$ 为批量大小。CLIP 的训练基于约 4 亿对互联网图像-文本数据，其跨模态对齐能力支撑了零样本分类与文本驱动的视觉检索。
 
-\textbf{DINO 视觉特征。}除 CLIP 外，本文系统还使用 DINO\cite{dino}的自监督视觉特征来增强对物体局部结构与高频细节的语义感知。DINO 通过自蒸馏（Self-distillation）机制在无标注数据上训练 ViT，其自注意力图中自然涌现出与物体部件分割高度相关的空间结构，为后续的三维特征溅射提供了互补的细粒度语义信息。
+\textbf{DINO 视觉特征：}除 CLIP 外，本文系统还使用 DINO\cite{dino}的自监督视觉特征来增强对物体局部结构与高频细节的语义感知。DINO 通过自蒸馏（Self-distillation）机制在无标注数据上训练 ViT，其自注意力图中自然涌现出与物体部件分割高度相关的空间结构，为后续的三维特征溅射提供了互补的细粒度语义信息。
 
-\textbf{视觉语言大模型（VLM）。}与 CLIP 的双编码器架构不同，VLM 通常采用自回归语言模型与视觉编码器的联合架构，能够生成自然语言文本序列以描述或推理图像内容。本文系统采用 Qwen3-VL-32B\cite{qwen3vl} 作为材质识别 VLM，通过将 SAM 分割并经 K-Means\cite{kmeans} 深度聚类分层后的各层掩码区域分别送入模型，获取每个区域的材质类别预测与置信度。相较于 CLIP 的隐式语义对齐，VLM 提供了显式的自然语言材质标注，可直接映射到材料本构模型的物理参数空间。
+\textbf{视觉语言大模型（VLM）：}与 CLIP 的双编码器架构不同，VLM 通常采用自回归语言模型与视觉编码器的联合架构，能够生成自然语言文本序列以描述或推理图像内容。本文系统采用 Qwen3-VL-32B\cite{qwen3vl} 作为材质识别 VLM，通过将 SAM 分割并经 K-Means\cite{kmeans} 深度聚类分层后的各层掩码区域分别送入模型，获取每个区域的材质类别预测与置信度。相较于 CLIP 的隐式语义对齐，VLM 提供了显式的自然语言材质标注，可直接映射到材料本构模型的物理参数空间。
 
 \subsection{三维高斯特征蒸馏}
 前述二维视觉基础模型（SAM、CLIP、DINO、VLM）解决了"图像中有什么"的语义感知问题，但要将这些语义信息注入三维场景表征，还需要一个将二维特征迁移至三维高斯原语的映射机制。Feature Splatting\cite{featuresplatting} 提出了一种通用的三维高斯特征蒸馏框架：在每个高斯原语 $G_k$ 上除原有的视觉参数外，额外挂载一个可学习的 $D$ 维特征向量 $\mathbf{f}_k \in \mathbb{R}^D$，称为蒸馏特征（distill features）。在正向渲染过程中，该特征向量与颜色共享同一组 $\alpha$-blending 权重，渲染得到二维特征图 $\mathbf{F}(\mathbf{p})$：
@@ -106,21 +122,21 @@ SAM 的架构由三个核心组件构成：
 \mathbf{F}(\mathbf{p}) = \sum_{k=1}^{K} \mathbf{f}_k \alpha_k \prod_{j=1}^{k-1} (1 - \alpha_j)
 \end{equation}
 
-特征蒸馏的核心监督信号来自预提取的二维视觉特征图。设目标特征图为 $\mathbf{F}^{\text{gt}}$（可为 CLIP 特征、DINO 特征或其组合），有效监督像素集合为 $\mathcal{M}$，特征蒸馏采用区域平均的余弦相似度损失：
+特征蒸馏的核心监督信号来自预提取的二维视觉特征图。设目标特征图为 $\mathbf{F}^{\text{gt}}$ 可为 CLIP 特征、DINO 特征或其组合，有效监督像素集合为 $\mathcal{M}$，特征蒸馏采用区域平均的余弦相似度损失：
 
 \begin{equation}
 \mathcal{L}_{\text{feat}} = \frac{1}{|\mathcal{M}|}\sum_{\mathbf{p}\in\mathcal{M}}\left(1 - \frac{\mathbf{F}(\mathbf{p}) \cdot \mathbf{F}^{\text{gt}}(\mathbf{p})}{\|\mathbf{F}(\mathbf{p})\| \|\mathbf{F}^{\text{gt}}(\mathbf{p})\|}\right)
 \end{equation}
 
-该损失驱动高斯原语在保持几何外观（由 RGB 损失约束）的同时，使其挂载的特征向量与二维基础模型的语义空间对齐。为增强细粒度材质分区能力，系统进一步引入多尺度蒸馏策略：（1）\textbf{对象级特征}：利用 SAM 实例掩码对 CLIP patch 特征进行空间聚合，获得每个物体的全局语义描述；（2）\textbf{零件级特征}：对各物体包围盒区域独立编码后回贴至原图位置，保留物体内部的局部材质差异。两类特征经维度级联后共同构成训练阶段的多元语义监督，使高斯原语同时对齐视觉语义空间与材质分区边界。
+该损失驱动高斯原语在保持由 RGB 损失约束的几何外观的同时，使其挂载的特征向量与二维基础模型的语义空间对齐。为增强细粒度材质分区能力，系统进一步引入多尺度蒸馏策略：对象级特征利用 SAM 实例掩码对 CLIP patch 特征进行空间聚合，获得每个物体的全局语义描述；零件级特征对各物体包围盒区域独立编码后回贴至原图位置，保留物体内部的局部材质差异。两类特征经维度级联后共同构成训练阶段的多元语义监督，使高斯原语同时对齐视觉语义空间与材质分区边界。
 
 \section{连续介质力学与视频生成先验}
 
 \subsection{物质点法（MPM）的动态演化基础}
 
-物质点法（Material Point Method, MPM）\cite{mpm} 是一类混合 Lagrangian-Eulerian 格式的连续介质力学数值求解方法，特别适用于处理大变形、断裂、碰撞等极端力学问题。其核心优势在于使用 Lagrangian 粒子（物质点）携带全部物理状态量，在 Eulerian 背景网格上求解动量守恒方程，从而在每一时间步内自然处理接触与自碰撞。
+物质点法（Material Point Method, MPM）\cite{mpm} 是一类混合 Lagrangian-Eulerian 格式的连续介质力学数值求解方法，特别适用于处理大变形、断裂、碰撞等极端力学问题。其核心优势在于使用 Lagrangian 粒子即物质点携带全部物理状态量，在 Eulerian 背景网格上求解动量守恒方程，从而在每一时间步内自然处理接触与自碰撞。
 
-\textbf{控制方程。}连续介质在等温条件下的运动遵循质量守恒与动量守恒：
+\textbf{控制方程：}连续介质在等温条件下的运动遵循质量守恒与动量守恒：
 
 \begin{equation}
 \frac{D\rho}{Dt} + \rho \nabla \cdot \mathbf{v} = 0, \quad \rho \frac{D\mathbf{v}}{Dt} = \nabla \cdot \boldsymbol{\sigma} + \rho \mathbf{g}
@@ -138,16 +154,23 @@ $\boldsymbol{\varepsilon}$ 为无穷小应变张量，$\mu$ 和 $\lambda$ 为 La
 \mu = \frac{E}{2(1 + \nu)}, \quad \lambda = \frac{E\nu}{(1 + \nu)(1 - 2\nu)}
 \end{equation}
 
-\textbf{MPM 求解流程。}单个时间步的 MPM 计算遵循以下粒子-网格-粒子（P2G-G2P）循环：
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{P2G-G2P.png}
+    \caption{MPM 单时间步 P2G-G2P 循环示意图}
+    \label{fig:mpm_p2g_g2p_cycle}
+\end{figure}
 
-\textbf{粒子到网格（P2G）} 阶段将物质点的质量和动量通过形函数 $N_i(\mathbf{x}_p)$ 转移到背景网格节点，计算节点质量 $m_i = \sum_p m_p N_i(\mathbf{x}_p)$ 和节点动量 $(m\mathbf{v})_i = \sum_p m_p \mathbf{v}_p N_i(\mathbf{x}_p)$。\textbf{网格应力计算} 阶段在网格节点上计算内力 $-\sum_p V_p \boldsymbol{\sigma}_p \nabla N_i(\mathbf{x}_p)$（$V_p$ 为粒子体积），施加外部力后在网格上求解离散动量方程更新节点速度。\textbf{网格到粒子（G2P）} 阶段将更新后的网格节点速度插值回物质点，更新物质点的位置 $\mathbf{x}_p^{n+1} = \mathbf{x}_p^n + \Delta t \cdot \mathbf{v}_p^{n+1}$、速度及变形梯度 $\mathbf{F}_p$。\textbf{本构更新} 阶段根据变形梯度和材料本构模型更新每个物质点的应力 $\boldsymbol{\sigma}_p$。\textbf{网格重置} 阶段丢弃变形后的背景网格，在下一时间步重新初始化，从而避免网格畸变问题。
+\textbf{MPM 求解流程：}单个时间步的 MPM 计算遵循以下粒子-网格-粒子（P2G-G2P）循环：
+
+粒子到网格（P2G）阶段将物质点的质量和动量通过形函数 $N_{ip}=N_i(\mathbf{x}_p)$ 转移到背景网格节点，计算节点质量 $m_i = \sum_p m_p N_{ip}$。若采用 APIC 形式，还可引入粒子仿射速度矩阵 $\mathbf{C}_p$，将节点动量写为 $(m\mathbf{v})_i = \sum_p m_p [\mathbf{v}_p+\mathbf{C}_p(\mathbf{x}_i-\mathbf{x}_p)]N_{ip}$，再由 $\mathbf{v}_i^n=(m\mathbf{v})_i/m_i$ 得到网格节点速度。网格应力计算阶段在网格节点上组装内力 $\mathbf{f}_i^{\text{int}}=-\sum_p V_p \boldsymbol{\sigma}_p \nabla N_{ip}$，并与重力、碰撞和边界约束等外力共同构成 $\mathbf{f}_i=\mathbf{f}_i^{\text{int}}+\mathbf{f}_i^{\text{ext}}$，随后按 $\mathbf{v}_i^{n+1}=\mathbf{v}_i^n+\Delta t\cdot\mathbf{f}_i/m_i$ 更新节点速度。网格到粒子（G2P）阶段将更新后的网格节点速度插值回物质点，计算 $\mathbf{v}_p^{n+1}=\sum_i N_{ip}\mathbf{v}_i^{n+1}$，并更新物质点位置 $\mathbf{x}_p^{n+1} = \mathbf{x}_p^n + \Delta t \cdot \mathbf{v}_p^{n+1}$。同时由 $\nabla\mathbf{v}_p^{n+1}=\sum_i \mathbf{v}_i^{n+1}(\nabla N_{ip})^\top$ 更新形变梯度 $\mathbf{F}_p^{n+1}=(\mathbf{I}+\Delta t\nabla\mathbf{v}_p^{n+1})\mathbf{F}_p^n$。本构更新阶段根据新的形变梯度和材料参数计算每个物质点的应力 $\boldsymbol{\sigma}_p^{n+1}=\sigma(\mathbf{F}_p^{n+1};E,\nu)$。网格重置阶段丢弃临时背景网格，在下一时间步重新初始化，从而避免网格畸变问题。
 
 
 \subsection{视频扩散模型（SVD）与分数蒸馏采样}
 
 Stable Video Diffusion（SVD）\cite{svd} 是一种基于潜在扩散模型（Latent Diffusion Models, LDM）\cite{ldm} 的图像到视频（Image-to-Video）生成模型。SVD 通过在潜在空间进行扩散与去噪过程，以单张图像为条件生成具有时空一致性的视频序列。
 
-\textbf{潜在扩散模型的前向过程。}给定数据分布 $q(\mathbf{x}_0)$，前向扩散过程通过 $T$ 步逐步向干净数据 $\mathbf{x}_0$ 中添加高斯噪声，产生一系列噪声样本 $\mathbf{x}_1, \ldots, \mathbf{x}_T$：
+\textbf{潜在扩散模型的前向过程：}给定数据分布 $q(\mathbf{x}_0)$，前向扩散过程通过 $T$ 步逐步向干净数据 $\mathbf{x}_0$ 中添加高斯噪声，产生一系列噪声样本 $\mathbf{x}_1, \ldots, \mathbf{x}_T$：
 
 \begin{equation}
 q(\mathbf{x}_t | \mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_t; \sqrt{1 - \beta_t} \mathbf{x}_{t-1}, \beta_t \mathbf{I})
@@ -161,21 +184,21 @@ q(\mathbf{x}_t | \mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_t; \sqrt{1 - \beta_t
 
 其中 $\alpha_t = 1 - \beta_t$，$\bar{\alpha}_t = \prod_{s=1}^{t} \alpha_s$。
 
-\textbf{反向去噪过程。}扩散模型的训练目标是学习一个噪声预测网络 $\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})$，从噪声数据中逐步恢复原始信号，其中 $\mathbf{c}$ 为条件信号（如图像条件）。SVD 采用的训练目标为：
+\textbf{反向去噪过程：}扩散模型的训练目标是学习一个噪声预测网络 $\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})$，从噪声数据中逐步恢复原始信号，其中 $\mathbf{c}$ 为条件信号如图像条件等。SVD 采用的训练目标为：
 
 \begin{equation}
 \mathcal{L}_{\text{SVD}} = \mathbb{E}_{\mathbf{x}_0, \boldsymbol{\epsilon}, t, \mathbf{c}} \left[ \left\| \boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c}) \right\|_2^2 \right]
 \end{equation}
 
-\textbf{潜在空间操作。}为降低计算复杂度，SVD 将扩散过程从像素空间迁移到预训练 VAE 编码器 $\mathcal{E}$ 的潜在空间。给定视频序列 $\mathbf{V} \in \mathbb{R}^{F \times H \times W \times 3}$，首帧 $\mathbf{I}_0$ 被编码为潜在表示 $\mathbf{z}_0 = \mathcal{E}(\mathbf{I}_0)$，后续帧在潜在空间中进行扩散生成，最终通过 VAE 解码器 $\mathcal{D}$ 重建为像素视频。
+\textbf{潜在空间操作：}为降低计算复杂度，SVD 将扩散过程从像素空间迁移到预训练 VAE 编码器 $\mathcal{E}$ 的潜在空间。给定视频序列 $\mathbf{V} \in \mathbb{R}^{F \times H \times W \times 3}$，首帧 $\mathbf{I}_0$ 被编码为潜在表示 $\mathbf{z}_0 = \mathcal{E}(\mathbf{I}_0)$，后续帧在潜在空间中进行扩散生成，最终通过 VAE 解码器 $\mathcal{D}$ 重建为像素视频。
 
-\textbf{分数蒸馏采样（SDS）。}分数蒸馏采样（Score Distillation Sampling, SDS）由 DreamFusion\cite{dreamfusion} 提出，是一种利用预训练扩散模型作为可微分先验的通用优化方法。其核心思想是：给定待优化参数 $\theta$ 及其生成的观测 $\mathbf{x} = g(\theta)$，将 $\mathbf{x}$ 通过前向扩散加噪得到 $\mathbf{x}_t$，利用扩散模型预测注入噪声，并将预测误差的梯度反传至参数 $\theta$：
+\textbf{分数蒸馏采样（SDS）：}分数蒸馏采样（Score Distillation Sampling, SDS）由 DreamFusion\cite{dreamfusion} 提出，是一种利用预训练扩散模型作为可微分先验的通用优化方法。其核心思想是：给定待优化参数 $\theta$ 及其生成的观测 $\mathbf{x} = g(\theta)$，将 $\mathbf{x}$ 通过前向扩散加噪得到 $\mathbf{x}_t$，利用扩散模型预测注入噪声，并将预测误差的梯度反传至参数 $\theta$：
 
 \begin{equation}
 \nabla_\theta \mathcal{L}_{\text{SDS}} = \mathbb{E}_{t, \boldsymbol{\epsilon}} \left[ w(t) \left( \hat{\boldsymbol{\epsilon}}_\phi(\mathbf{x}_t, t, \mathbf{c}) - \boldsymbol{\epsilon} \right) \frac{\partial \mathbf{x}}{\partial \theta} \right]
 \end{equation}
 
-其中 $\hat{\boldsymbol{\epsilon}}_\phi$ 为扩散模型的噪声预测网络，$\mathbf{c}$ 为条件信号（如文本或首帧图像），$w(t)$ 为时间步加权系数，$\boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ 为注入的标准高斯噪声。该梯度的直观含义是：当生成结果 $\mathbf{x}$ 与扩散模型的先验分布存在偏差时，SDS 会沿使 $\mathbf{x}$ 更接近扩散模型预期分布的方向更新参数 $\theta$，从而实现无需真值标注的自监督优化。在本文系统中，SDS 被用作连接 SVD 视频扩散先验与 MPM 物理参数的桥梁——以 MPM 仿真渲染帧为 $\mathbf{x}$、以 SVD 为 $\hat{\boldsymbol{\epsilon}}_\phi$，将视频运动先验蒸馏为物理参数的优化梯度。
+其中 $\hat{\boldsymbol{\epsilon}}_\phi$ 为扩散模型的噪声预测网络，$\mathbf{c}$ 为条件信号如文本或首帧图像等，$w(t)$ 为时间步加权系数，$\boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ 为注入的标准高斯噪声。该梯度的直观含义是：当生成结果 $\mathbf{x}$ 与扩散模型的先验分布存在偏差时，SDS 会沿使 $\mathbf{x}$ 更接近扩散模型预期分布的方向更新参数 $\theta$，从而实现无需真值标注的自监督优化。在本文系统中，SDS 被用作连接 SVD 视频扩散先验与 MPM 物理参数的桥梁——以 MPM 仿真渲染帧为 $\mathbf{x}$、以 SVD 为 $\hat{\boldsymbol{\epsilon}}_\phi$，将视频运动先验蒸馏为物理参数的优化梯度。
 
 \section{本章小结}
 
