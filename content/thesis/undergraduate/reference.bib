@@ -23,7 +23,7 @@
 
 % [2] FlashWorld — 快速3D场景生成
 @article{flashworld,
-  author  = {Li, Xinyang and Wang, Tianhao and Gu, Zhexun and Xu, Linning and others},
+  author  = {Li, Xinyang and Wang, Tengfei and Gu, Zixiao and Zhang, Shengchuan and Guo, Chunchao and Cao, Liujuan},
   title   = {FlashWorld: High-quality {3D} Scene Generation within Seconds},
   journal = {arXiv preprint arXiv:2510.13678},
   year    = {2025}
@@ -76,13 +76,19 @@
   pages     = {9650--9660}
 }
 
-% [8] WonderWorld — 交互式3D场景生成
-@inproceedings{wonderworld,
-  author    = {Yu, Hong-Xing and Duan, Haoyi and Herrmann, Charles and others},
-  title     = {Wonderworld: Interactive {3D} Scene Generation from a Single Image},
-  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-  year      = {2025},
-  pages     = {5916--5926}
+@inproceedings{vit,
+  author    = {Dosovitskiy, Alexey and Beyer, Lucas and Kolesnikov, Alexander and Weissenborn, Dirk and Zhai, Xiaohua and Unterthiner, Thomas and Dehghani, Mostafa and Minderer, Matthias and Heigold, Georg and Gelly, Sylvain and Uszkoreit, Jakob and Houlsby, Neil},
+  title     = {An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2021}
+}
+
+@inproceedings{transformer,
+  author    = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+  title     = {Attention Is All You Need},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2017},
+  pages     = {5998--6008}
 }
 
 % [9] LucidDreamer — 无域3DGS场景生成
@@ -95,9 +101,10 @@
 
 % [10] GaussianProperty — 物理属性集成到3D高斯
 @inproceedings{gaussianproperty,
-  author    = {Xu, Xinhang and Ge, Wenjie and Qiu, Daozong and others},
+  author    = {Xu, Xinli and Ge, Wenhang and Qiu, Dicong and Chen, ZhiFei and Yan, Dongyu and Liu, Zhuoyun and Zhao, Haoyu and Zhao, Hanfeng and Zhang, Shunsi and Liang, Junwei and Chen, Ying-Cong},
   title     = {Gaussianproperty: Integrating Physical Properties to {3D} Gaussians with {LMMs}},
   booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision},
+  month     = {10},
   year      = {2025},
   pages     = {7231--7240}
 }
@@ -127,6 +134,22 @@
   year    = {2022}
 }
 
+% DreamGaussian — 高效3D高斯生成
+@article{dreamgaussian,
+  author  = {Tang, Jiaxiang and Ren, Jiawei and Zhou, Hang and Liu, Ziwei and Zeng, Gang},
+  title   = {{DreamGaussian}: Generative {G}aussian {S}platting for Efficient {3D} Content Creation},
+  journal = {arXiv preprint arXiv:2309.16653},
+  year    = {2023}
+}
+
+% LGM — 多视图前馈式高斯生成
+@article{lgm,
+  author  = {Tang, Jiaxiang and Chen, Zhaoxi and Chen, Xiaokang and Wang, Tengfei and Zeng, Gang and Liu, Ziwei},
+  title   = {{LGM}: Large Multi-View {G}aussian Model for High-Resolution {3D} Content Creation},
+  journal = {arXiv preprint arXiv:2402.05054},
+  year    = {2024}
+}
+
 % [14] SSIM — 图像质量评估
 @article{ssim,
   author  = {Wang, Zhou and Bovik, Alan C. and Sheikh, Hamid R. and Simoncelli, Eero P.},
@@ -136,15 +159,6 @@
   volume  = {13},
   number  = {4},
   pages   = {600--612}
-}
-
-% [15] LPIPS — 感知相似度度量
-@inproceedings{lpips,
-  author    = {Zhang, Richard and Isola, Phillip and Efros, Alexei A. and Shechtman, Eli and Wang, Oliver},
-  title     = {The Unreasonable Effectiveness of Deep Features as a Perceptual Metric},
-  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
-  year      = {2018},
-  pages     = {586--595}
 }
 
 % [16] PhysDreamer — 物理交互视频生成
@@ -166,6 +180,14 @@
   pages     = {6178--6189}
 }
 
+% [17a] OmniPhysGS — 通用物理动态生成
+@inproceedings{omniphysgs,
+  author    = {Lin, Yuchen and Lin, Chenguo and Xu, Jianjin and Mu, Yadong},
+  title     = {{OmniPhysGS}: {3D} Constitutive {G}aussians for General Physics-Based Dynamics Generation},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2025}
+}
+
 % [18] Deformable 3D Gaussians — 动态可变形3D高斯
 @inproceedings{deformable3dgs,
   author    = {Yang, Ziyi and Gao, Xinyu and Zhou, Wen and Jiao, Shaohui and Zhang, Yuqing and Jin, Xiaogang},
@@ -173,6 +195,15 @@
   booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
   year      = {2024},
   pages     = {20331--20341}
+}
+
+% 4D-GS — 动态场景高斯表征
+@inproceedings{fourdgs,
+  author    = {Wu, Guanjun and Yi, Taoran and Fang, Jiemin and Xie, Lingxi and Zhang, Xiaopeng and Wei, Wei and Liu, Wenyu and Tian, Qi and Wang, Xinggang},
+  title     = {{4D} {G}aussian {S}platting for Real-Time Dynamic Scene Rendering},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  year      = {2024},
+  pages     = {20310--20320}
 }
 
 % [19] LERF — 语言嵌入辐射场
@@ -195,12 +226,14 @@
   pages     = {3987--3995}
 }
 
-% [21] Gaga — 基于3D感知记忆库的高斯分组
-@article{gaga,
-  author  = {Lyu, Weijie and Li, Xueting and Kundu, Abhijit and Tsai, Yi-Hsuan and Yang, Ming-Hsuan},
-  title   = {Gaga: Group Any {G}aussians via {3D}-aware Memory Bank},
-  journal = {arXiv preprint arXiv:2404.07977},
-  year    = {2024}
+% Gaussian Grouping — 3D高斯实例分组与编辑
+@inproceedings{gaussiangrouping,
+  author    = {Ye, Mingqiao and Danelljan, Martin and Yu, Fisher and Ke, Lei},
+  title     = {{G}aussian {G}rouping: Segment and Edit Anything in {3D} Scenes},
+  booktitle = {European Conference on Computer Vision},
+  year      = {2024},
+  pages     = {162--179},
+  organization = {Springer}
 }
 
 % [22] PhyRecon — 物理合理的神经场景重建
@@ -221,25 +254,9 @@
   volume    = {37}
 }
 
-% [24] Qwen-VL — 视觉语言大模型
-@article{qwenvl,
-  author  = {Bai, Jinze and Bai, Shuai and Yang, Shusheng and Wang, Shijie and Tan, Sinan and Wang, Peng and Lin, Junyang and Zhou, Chang and Zhou, Jingren},
-  title   = {{Qwen-VL}: A Versatile Vision-Language Model for Understanding, Localization, Text Reading, and Beyond},
-  journal = {arXiv preprint arXiv:2308.12966},
-  year    = {2023}
-}
-
-% [24b] Qwen2.5-VL — 视觉语言大模型（Qwen3-VL 的前身，Qwen3-VL 暂无独立论文）
-@article{qwen25vl,
-  author  = {Bai, Shuai and Chen, Keqin and Liu, Xuejing and Wang, Jialin and Ge, Wenbin and Song, Sibo and Dang, Kai and Wang, Peng and Wang, Shijie and Tang, Jun and Zhong, Humen and Zhu, Yuanzhi and Yang, Mingkun and Li, Zhaohai and Wan, Jianqiang and Wang, Pengfei and Ding, Wei and Fu, Zheren and Xu, Yiheng and Ye, Jiabo and Zhang, Xi and Xie, Tianbao and Cheng, Zesen and Zhang, Hang and Yang, Zhibo and Xu, Haiyang and Lin, Junyang},
-  title   = {{Qwen2.5-VL} Technical Report},
-  journal = {arXiv preprint arXiv:2502.13923},
-  year    = {2025}
-}
-
-% [24b] Qwen3-VL — 视觉语言大模型
+% [24c] Qwen3-VL — 视觉语言大模型
 @article{qwen3vl,
-  author  = {Qwen Team},
+  author  = {Bai, Shuai and Cai, Yuxuan and Chen, Ruizhe and Chen, Keqin and Chen, Xionghui and Cheng, Zesen and Deng, Lianghao and others},
   title   = {{Qwen3-VL} Technical Report},
   journal = {arXiv preprint arXiv:2511.21631},
   year    = {2025}
@@ -251,6 +268,14 @@
   title   = {Stable Video Diffusion: Scaling Latent Video Diffusion Models to Large Datasets},
   journal = {arXiv preprint arXiv:2311.15127},
   year    = {2023}
+}
+
+% Physics3D — 视频扩散学习3D高斯物理属性
+@article{physics3d,
+  author  = {Liu, Fangfu and Wang, Hanyang and Yao, Shunyu and Zhang, Shengjun and Zhou, Jie and Duan, Yueqi},
+  title   = {{Physics3D}: Learning Physical Properties of {3D} {G}aussians via Video Diffusion},
+  journal = {arXiv preprint arXiv:2406.04338},
+  year    = {2024}
 }
 
 % [29] LDM — High-Resolution Image Synthesis with Latent Diffusion Models
@@ -278,6 +303,14 @@
   note   = {NVIDIA Developer Blog. \url{https://github.com/NVIDIA/warp}}
 }
 
+% DiffTaichi — 可微物理仿真
+@inproceedings{difftaichi,
+  author    = {Hu, Yuanming and Anderson, Luke and Li, Tzu-Mao and Sun, Qi and Carr, Nathan and Ragan-Kelley, Jonathan and Durand, Fr{\'e}do},
+  title     = {{DiffTaichi}: Differentiable Programming for Physical Simulation},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2020}
+}
+
 % [32] MPM — A Particle Method for History-Dependent Materials
 @article{mpm,
   author  = {Sulsky, Deborah and Chen, Zhen and Schreyer, Howard L.},
@@ -287,6 +320,16 @@
   volume  = {118},
   number  = {1--2},
   pages   = {179--196}
+}
+
+@article{apic,
+  author  = {Jiang, Chenfanfu and Schroeder, Craig and Selle, Andrew and Teran, Joseph and Stomakhin, Alexey},
+  title   = {The Affine Particle-In-Cell Method},
+  journal = {ACM Transactions on Graphics},
+  year    = {2015},
+  volume  = {34},
+  number  = {4},
+  pages   = {51:1--51:10}
 }
 
 % [33] DINOv2 — Learning Robust Visual Features without Supervision
@@ -324,32 +367,6 @@
   booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
   year      = {2022},
   pages     = {16000--16009}
-}
-
-% [37] ModelScope — Text-to-Video
-@article{modelscope,
-  author  = {Wang, Jiuniu and Yuan, Hangjie and Chen, Dayou and Zhang, Yingya and Wang, Xiang and Zhang, Shiwei},
-  title   = {{ModelScope} Text-to-Video Technical Report},
-  journal = {arXiv preprint arXiv:2308.06571},
-  year    = {2023}
-}
-
-% [28] GNS — Learning to Simulate Complex Physics with Graph Networks
-@inproceedings{gns,
-  author    = {Sanchez-Gonzalez, Alvaro and Godwin, Jonathan and Pfaff, Tobias and Ying, Rex and Leskovec, Jure and Battaglia, Peter W.},
-  title     = {Learning to Simulate Complex Physics with Graph Networks},
-  booktitle = {International Conference on Machine Learning},
-  year      = {2020},
-  pages     = {8459--8468},
-  publisher = {PMLR}
-}
-
-% [29] MeshGraphNets — Learning Mesh-Based Simulation with Graph Networks
-@inproceedings{meshgraphnets,
-  author    = {Pfaff, Tobias and Fortunato, Meire and Sanchez-Gonzalez, Alvaro and Battaglia, Peter W.},
-  title     = {Learning Mesh-Based Simulation with Graph Networks},
-  booktitle = {International Conference on Learning Representations},
-  year      = {2021}
 }
 
 % [25] LangSplat — 3D Language Gaussian Splatting
@@ -401,4 +418,24 @@
   title   = {{DreamGaussian4D}: Generative {4D} Gaussian Splatting},
   journal = {arXiv preprint arXiv:2312.17142},
   year    = {2023}
+}
+
+% CJIG — 三维高斯溅射语义扩展综述
+@article{cjig3dgssemantic,
+  author  = {李丽芬 and 张思佳 and 张荣华},
+  title   = {三维高斯溅射语义扩展研究综述},
+  journal = {中国图象图形学报},
+  year    = {2026},
+  pages   = {1--18}
+}
+
+% CJIG — 三维高斯物理逆渲染
+@article{cjigphysinverse,
+  author  = {刘铮 and 汤圣君 and 姚萌萌 and 李游 and 郭仁忠},
+  title   = {融合三维高斯泼溅几何增强与高效材质编码的快速物理逆渲染框架},
+  journal = {中国图象图形学报},
+  year    = {2026},
+  volume  = {31},
+  number  = {3},
+  pages   = {896--911}
 }

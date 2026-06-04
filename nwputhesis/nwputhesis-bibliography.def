@@ -11,6 +11,9 @@
 \cs_if_exist:cF { gbpunctcolonlanen } { \cs_new:Npn \gbpunctcolonlanen { \addcolon\addspace } }
 \cs_if_exist:cF { gbpunctdot } { \cs_new:Npn \gbpunctdot { \adddot\addspace } }
 \cs_if_exist:cF { gbpunctdotlanen } { \cs_new:Npn \gbpunctdotlanen { \adddot\addspace } }
+\cs_set:Npn \gbpunctcomma { \addcomma }
+\cs_set:Npn \gbpunctcolon { \addcolon }
+\cs_set:Npn \gbpunctdot { \adddot }
 \cs_new:Npn \nwpucolon { \iffieldequalstr{userd}{chinese}{\gbpunctcolon}{\gbpunctcolonlanen} }
 \cs_new:Npn \nwp comma { \iffieldequalstr{userd}{chinese}{\gbpunctcomma}{\gbpunctcommalanen} }
 \cs_new:Npn \nwpudot { \iffieldequalstr{userd}{chinese}{\gbpunctdot}{\gbpunctdotlanen} }
@@ -236,11 +239,11 @@
             }
             \map[overwrite]{
                 \pertype{conference}
-                \step[fieldset=usera, fieldvalue={A}]
+                \step[fieldset=usera, fieldvalue={C}]
             }
             \map[overwrite]{
                 \pertype{inproceedings}
-                \step[fieldset=usera, fieldvalue={A}]
+                \step[fieldset=usera, fieldvalue={C}]
             }
         }
     }
@@ -275,14 +278,11 @@
                 \printfield[booktitlecase]{booktitle}%
                 \iffieldundef{booksubtitle}{}{\setunit{\subtitlepunct}\printfield[booktitlecase]{booksubtitle}}%
                 \usebibmacro{nwpu:bachelorconfvolume}%
-                \printtext{[C]}%
             }}%
     }
     \newbibmacro*{nwpu:bachelorin}{%
-        \setunit{\nwpudot}%
-        \iffieldequalstr{userd}{chinese}
-            {\printtext{见：}}
-            {\printtext{In\addcolon\space}}%
+        \setunit{}%
+        \printtext{//}%
     }
     \DeclareBibliographyDriver{nwpubachelorconf}{%
         \usebibmacro{bibindex}%
@@ -299,10 +299,9 @@
         \usebibmacro{nwpu:bachelorbooktitle}%
         % \iffieldundef{volume}{}{\setunit{\nwpucolon}\printfield{volume}}%
         \iffieldundef{number}{}{\setunit{\nwpucolon}\printfield{number}}%
-        \newunit\newblock%
-        \printfield{edition}%
-        \newunit\newblock%
-        \usebibmacro{publisher+location+date}%
+        \iffieldundef{year}
+            {}
+            {\setunit{\nwpudot}\usebibmacro{date}}%
         \usebibmacro{chapter+pages}%
         \usebibmacro{doi+eprint+url}%
         \newunit\newblock%
