@@ -20,7 +20,7 @@
 所有场景均遵循统一的实验流程：首先进行物理参数初始化与前景背景解耦，然后执行 MPM\cite{mpm} 物理仿真并渲染输出视频序列，最终通过 VBench 评测框架与空间-时间切片工具进行自动化评估。定量表格中的各项分数由相同视频长度、相同分辨率和相同评价脚本计算后取平均，以保证不同方法之间的输入条件一致。
 
 \subsection{对比方法}
-为全面评估本文方法的有效性，选取了以下代表性方法进行对比实验。PhysDreamer\cite{physdreamer} 利用预生成的视频作为真实参考来监督物理参数学习，本文在此基础上引入 SVD 图像到视频扩散模型进行扩散先验蒸馏优化，避免预生成视频质量不稳定。PhysGaussian\cite{physgaussian} 作为基于物质点法物理仿真的三维高斯动态基线，将三维高斯转化为 MPM 物质点并通过连续介质仿真预测动态运动，其物理参数如杨氏模量等需手动设定。DreamGaussian4D\cite{dreamgaussian4d} 基于视频扩散模型蒸馏的四维生成方法，通过预测 3D 高斯的时间相关形变来生成动态内容，不依赖显式物理约束。此外设置 Ours (without SVD) 和 Ours (with SVD) 两种变体，分别对应本文方法在无 SVD 视频扩散先验优化与有 SVD 优化条件下的表现，用于消融验证视频先验对物理参数的优化效果。
+为全面评估本文方法的有效性，选取了以下代表性方法进行对比实验。PhysDreamer\cite{physdreamer} 利用预生成的视频作为真实参考来监督物理参数学习，本文在此基础上引入 SVD 图像到视频扩散模型进行扩散先验蒸馏优化，避免预生成视频质量不稳定。PhysGaussian\cite{physgaussian} 作为基于物质点法物理仿真的三维高斯动态基线，将三维高斯转化为 MPM 物质点并通过连续介质仿真预测动态运动，其物理参数如杨氏模量等需手动设定。DreamGaussian4D\cite{dreamgaussian4d} 基于视频扩散模型蒸馏的四维生成方法，通过预测 3D 高斯的时间相关形变来生成动态内容，不依赖显式物理约束。此外设置 Ours（without SVD）和 Ours（with SVD）两种变体，分别对应本文方法在无 SVD 视频扩散先验优化与有 SVD 优化条件下的表现，用于消融验证视频先验对物理参数的优化效果。
 
 \section{评价指标与评测流程}
 
@@ -48,8 +48,8 @@ Subject Consistency 评估视频中主体对象在时间维度上的外观稳定
         PhysDreamer       & \underline{9.968} & \textbf{9.888} & \textbf{9.972} & 5.134   & 657.088 \\
         PhysGaussian      & 9.798 & 9.732 & 9.968 & 5.106   & 660.397 \\
         DreamGaussian4D   & \textbf{9.982} & \underline{9.868} & 9.964 & 4.954   & 651.161 \\
-        Ours (without SVD) & 9.755 & 9.830 & \underline{9.971} & \underline{5.597} & \underline{718.833} \\
-        Ours (with SVD)    & 9.770 & 9.858 & \underline{9.971} & \textbf{5.657} & \textbf{724.276} \\
+        Ours（without SVD） & 9.755 & 9.830 & \underline{9.971} & \underline{5.597} & \underline{718.833} \\
+        Ours（with SVD）    & 9.770 & 9.858 & \underline{9.971} & \textbf{5.657} & \textbf{724.276} \\
         \bottomrule
     \end{tabular}
 \end{table}

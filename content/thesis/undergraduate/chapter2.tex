@@ -1,14 +1,14 @@
-﻿\chapter{相关技术基础}
+\chapter{相关技术基础}
 
 \section{引言}
 
-本章对论文系统涉及的核心理论基础进行阐述，从三维场景表征、视觉语义理解、连续介质仿真与视频生成四个方面展开，分别介绍神经辐射场与三维高斯溅射的渲染理论、SAM 与视觉语言大模型的基本架构、物质点法数值求解框架及视频扩散模型原理。
+本章对论文系统涉及的核心理论基础进行阐述，从三维场景表征、视觉语义理解、连续介质仿真与视频生成四个方面展开，分别介绍神经辐射场与三维高斯泼溅的渲染理论、SAM 与视觉语言大模型的基本架构、物质点法数值求解框架及视频扩散模型原理。
 
 \section{三维场景表征与渲染}
 
 \subsection{神经辐射场（NeRF）}
 
-神经辐射场（Neural Radiance Fields, NeRF）由 Mildenhall 等人于 2020 年提出\cite{nerf}，是一种基于隐式神经表征的三维场景新视角合成方法。其核心思想是将三维场景表示为一个连续函数 $F_\Theta: (\mathbf{x}, \mathbf{d}) \to (\mathbf{c}, \sigma)$，该函数由 MLP 参数化，输入空间坐标 $\mathbf{x} = (x, y, z)$ 与观测方向 $\mathbf{d} = (\theta, \phi)$，输出该点的颜色值 $\mathbf{c} = (r, g, b)$ 和体密度 $\sigma$，整体流程如图~\ref{fig:nerf_pipeline}~所示。
+神经辐射场（Neural Radiance Fields, NeRF）由 Mildenhall 等人于 2020 年提出\cite{nerf}，是一种基于隐式神经表征的三维场景新视角合成方法。其核心思想是将三维场景表示为一个连续函数 $F_\Theta: (\mathbf{x}, \mathbf{d}) \to (\mathbf{c}, \sigma)$，该函数由 MLP 参数化，输入空间坐标 $\mathbf{x} = (x, y, z)$ 与观测方向 $\mathbf{d} = (\theta, \phi)$，输出该点的视角相关颜色 $\mathbf{c} = (r, g, b)$ 和体密度 $\sigma$，整体流程如图~\ref{fig:nerf_pipeline}~所示。
 
 \begin{figure}[!htbp]
     \centering
@@ -37,11 +37,11 @@ NeRF 通过最小化渲染图像与真实图像之间的光度损失进行端到
 \gamma(p) = \left( \sin(2^0 \pi p), \cos(2^0 \pi p), \ldots, \sin(2^{L-1} \pi p), \cos(2^{L-1} \pi p) \right)
 \end{equation}
 
-尽管 NeRF 在渲染质量上取得了突破性成果，但其逐像素光线采样的渲染方式计算代价极高，难以满足实时交互需求。该速度瓶颈推动了对显式场景表征的探索，进而促进了三维高斯溅射等方法的发展。
+尽管 NeRF 在渲染质量上取得了突破性成果，但其逐像素光线采样的渲染方式计算代价极高，难以满足实时交互需求。该速度瓶颈推动了对显式场景表征的探索，进而促进了三维高斯泼溅等方法的发展。
 
-\subsection{三维高斯溅射（3DGS）}
+\subsection{三维高斯泼溅（3DGS）}
 
-三维高斯溅射（3D Gaussian Splatting, 3DGS）由 Kerbl 等人于 2023 年提出\cite{3dgs}。3DGS 将场景显式表征为一组各向异性三维高斯椭球体的集合。
+三维高斯泼溅（3D Gaussian Splatting, 3DGS）由 Kerbl 等人于 2023 年提出\cite{3dgs}。3DGS 将场景显式表征为一组各向异性三维高斯椭球体的集合。
 
 每个高斯基元 $G_k$ 由中心位置 $\boldsymbol{\mu}_k \in \mathbb{R}^3$、约束为正定矩阵的协方差矩阵 $\Sigma_k \in \mathbb{R}^{3 \times 3}$、不透明度 $\alpha_k \in [0, 1]$ 以及用于编码视角相关颜色外观的球谐系数（SH coefficients）完整定义。
 
@@ -179,7 +179,7 @@ $\boldsymbol{\varepsilon}$ 为无穷小应变张量，$\mu$ 和 $\lambda$ 为 La
 
 \subsection{视频扩散模型（SVD）与分数蒸馏采样}
 
-Stable Video Diffusion（SVD）\cite{svd} 是一种基于潜在扩散模型（Latent Diffusion Models, LDM）\cite{ldm} 的图像到视频（Image-to-Video）生成模型。SVD 通过在潜在空间进行扩散与去噪过程，以单张图像为条件生成具有时空一致性的视频序列。
+Stable Video Diffusion（SVD）\cite{svd} 是一种基于去噪扩散概率模型（Denoising Diffusion Probabilistic Models, DDPM）\cite{ddpm} 与潜在扩散模型（Latent Diffusion Models, LDM）\cite{ldm} 的图像到视频（Image-to-Video）生成模型。SVD 通过在潜在空间进行扩散与去噪过程，以单张图像为条件生成具有时空一致性的视频序列。
 
 \textbf{潜在扩散模型的前向过程：}给定数据分布 $q(\mathbf{x}_0)$，前向扩散过程通过 $T$ 步逐步向干净数据 $\mathbf{x}_0$ 中添加高斯噪声，产生一系列噪声样本 $\mathbf{x}_1, \ldots, \mathbf{x}_T$：
 
@@ -222,4 +222,4 @@ q(\mathbf{x}_t | \mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_t; \sqrt{1 - \beta_t
 
 \section{本章小结}
 
-本章系统梳理了贯穿本文系统研发的核心理论与技术。在三维场景表征方面，通过对比隐式辐射场与三维高斯溅射，阐明了场景重建从保真度到高效率的发展思路。在视觉语义理解方面，从 SAM 的全开集分割能力到 CLIP 与 VLM 的跨模态语义认知，构建了连接二维像素级视觉表象与三维物理世界概念的语义桥梁。在跨维度特征蒸馏方面，阐述了如何将二维基础模型提取的高维语义特征通过可微 $\alpha$-blending 注入三维高斯粒子，并引入多尺度蒸馏策略增强细粒度材质分区能力。在动力学仿真方面，探讨了 MPM 计算框架的大变形数值处理优势以及 SVD 与 SDS 在可微物理优化中的协同机制。以上理论基础的有机结合，构成了“场景构建—材质理解—三维映射—多材质仿真”闭环的技术基石，为后续各章节的模块设计提供了理论支撑。
+本章系统梳理了贯穿本文系统研发的核心理论与技术。在三维场景表征方面，通过对比隐式辐射场与三维高斯泼溅，阐明了场景重建从保真度到高效率的发展思路。在视觉语义理解方面，从 SAM 的可提示分割能力到 CLIP 与 VLM 的跨模态语义认知，构建了连接二维像素级视觉表象与三维物理世界概念的语义桥梁。在跨维度特征蒸馏方面，阐述了如何将二维基础模型提取的高维语义特征通过可微 $\alpha$-blending 注入三维高斯粒子，并引入多尺度蒸馏策略增强细粒度材质分区能力。在动力学仿真方面，探讨了 MPM 计算框架的大变形数值处理优势以及 SVD 与 SDS 在可微物理优化中的协同机制。以上理论基础的有机结合，构成了“场景构建—材质理解—三维映射—多材质仿真”闭环的技术基石，为后续各章节的模块设计提供了理论支撑。

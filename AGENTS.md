@@ -43,7 +43,7 @@ content/thesis/undergraduate/
 - Don't use AI-sounding phrases
 - Write like a CVPR/ICCV/NeurIPS paper
 - Be concise, direct, factual
-- No "firstly, secondly" AI scaffolding**
+- No "firstly, secondly" AI scaffolding
 
 # 八荣八耻
 - 以瞎猜接口为耻，以认真查询为荣。
