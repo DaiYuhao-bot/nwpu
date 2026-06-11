@@ -58,7 +58,7 @@
             {\setunit{\subtitlepunct}\printfield{volume}}{}%
        \ifboolexpr{(test{\ifentrytype{archive}} or  test{\ifentrytype{online}}) and (not test{\iffieldundef{number}})}%
             {\setunit{\subtitlepunct}\printfield{number}}{}%
-       \iftoggle{bbx:gbtype}%
+       \setunit{\addspace}\iftoggle{bbx:gbtype}%
             {\iffieldundef{entrysubtype}{\printfield[gbtypeflag]{usera}}%
             {\iffieldequalstr{entrysubtype}{standard}{\printfield[gbtypeflags]{usera}}%
                   {\iffieldequalstr{entrysubtype}{news}{\printfield[gbtypeflagn]{usera}}%
@@ -301,7 +301,7 @@
         \iffieldundef{number}{}{\setunit{\nwpucolon}\printfield{number}}%
         \iffieldundef{year}
             {}
-            {\setunit{\nwpudot}\usebibmacro{date}}%
+            {\setunit{\nwp comma}\usebibmacro{date}}%
         \usebibmacro{chapter+pages}%
         \usebibmacro{doi+eprint+url}%
         \newunit\newblock%

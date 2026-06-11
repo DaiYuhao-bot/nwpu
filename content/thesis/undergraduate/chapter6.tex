@@ -56,6 +56,8 @@ Subject Consistency 评估视频中主体对象在时间维度上的外观稳定
 
 PhysDreamer 在 Background Consistency 和 Motion Smoothness 上均取得最优，在 Subject Consistency 上以次优紧随 DreamGaussian4D。DreamGaussian4D 的 Subject Consistency 虽最高，但其形变预测趋于静态，近乎静止的帧序列天然有利于该指标，纯形变方法在 Aesthetic Quality 和 Imaging Quality 上均最低，表明缺乏物理约束的视频在视觉自然度和成像保真度上不及物理仿真方法。本文方法在 Aesthetic Quality 和 Imaging Quality 两项指标上均占据前两位，SVD 优化带来了可观察的正向增益。PhysGaussian 各项指标整体偏低，手动赋参引发的非预期形变同时损害了背景稳定性和主体一致性。与 DreamPhysics\cite{dreamphysics} 仅以 Aesthetic Quality 为量化指标的评估范式相比，本文扩展至五个 VBench 维度，覆盖了更全面的质量维度。需要指出的是，VBench 本身更偏向视频生成质量评价，不能单独证明物理参数的绝对真实性，因此本文将该指标与空间-时间切片共同使用。
 
+上述 VBench 对比结果还凸显了本文方法在自动化与多材质仿真两个维度上的系统性优势。PhysDreamer 与 PhysGaussian 均要求为场景中每个物体手动指定杨氏模量、泊松比等物理参数，在多材质场景下，人工赋参不仅操作繁琐，且难以确保不同部件间的参数比例符合真实物理规律——PhysGaussian 各项指标偏低即与此直接相关。本文方法通过 VLM 自动识别各分割区域的材质类别，依据九类材料-本构模型映射表将视觉语义转换为颗粒级物理参数，全程无需人工干预。同一场景中不同物体可被分配不同的 MPM 本构模型——例如橡胶部件采用 Maxwell 黏弹性模型、金属部件采用弹塑性模型、木材部件采用横观各向异性模型——从而在仿真中同时呈现弹性摆动、塑性变形和各向异性弯曲等差异化运动行为。CFL 条件约束与少数类裁剪策略进一步保障了自动化管线的数值稳定性。上述自动化多材质仿真能力是本文方法在 Aesthetic Quality 与 Imaging Quality 两项指标上优于各对比方法的底层系统原因。
+
 
 \section{空间-时间切片分析}
 
